@@ -38,86 +38,69 @@ settings = {
     "tool_choice": "auto"
 }
 
-# Handles the chat
 @cl.on_message
 async def main(message: cl.Message):
-    # Load existing or start new history
-    history = cl.user_session.get("history", [])
+    # First call: model may request a tool
+    init_messages = [
+        {"role": "system", "content": system_prompt},
+        {"role": "user", "content": message.content}
+    ]
 
-    # Add the current user message
-    history.append({"role": "user", "content": message.content})
-
-    # Ensure system prompt is always first
-    messages = [{"role": "system", "content": system_prompt}] + history
-
-    # Send conversation to the model
     stream = await client.chat.completions.create(
-        messages=messages,
+        messages=init_messages,
         stream=True,
         **settings
     )
 
     msg = await cl.Message(content="").send()
     assistant_reply = ""
-
-    # Buffer for tool calls (since arguments arrive in pieces)
     pending_tool_calls = {}
 
     async for chunk in stream:
         choice = chunk.choices[0]
 
-        # Handle tool calls incrementally
+        # Capture tool calls
         if choice.delta.tool_calls:
             for tool_call in choice.delta.tool_calls:
                 call_id = tool_call.id
-
                 if call_id not in pending_tool_calls:
                     pending_tool_calls[call_id] = {
                         "name": tool_call.function.name,
                         "arguments": ""
                     }
-
                 if tool_call.function.arguments:
                     pending_tool_calls[call_id]["arguments"] += tool_call.function.arguments
-                    print("Tool call ongoing. Line 82")
+                    print("Tool call ongoing...")
 
-        # Handle streamed text
+        # Stream any plain text tokens (in case model responds directly)
         if token := choice.delta.content:
             assistant_reply += token
             await msg.stream_token(token)
 
-        # Handle completion
         if choice.finish_reason:
             break
 
-    # Process completed tool calls
+    # Process tool calls
     for call_id, call in pending_tool_calls.items():
-        print("Final accumulation of calls ongoing. (Line 95)")
         try:
             args = json.loads(call["arguments"])
-            print("Parsed arguments: " + json.dumps(args, indent=2))
-        except json.JSONDecodeError as e:
+            print("Parsed tool args:\n" + json.dumps(args, indent=2))
+        except json.JSONDecodeError:
             args = {}
-            print("Failure.")
+            print("Failed to parse tool arguments")
 
         query = args.get("query")
         max_results = args.get("max_results", 3)
 
         print(f"Calling dbpedia_lookup with query={query}, max_results={max_results}")
         result = await dbpedia_lookup(query, max_results)
-        print(f"dbpedia_lookup result:\n{result[:500]}...")
 
         if "error" in result.lower() or "No DBpedia result" in result:
-            fallback = (
+            tool_content = (
                 "DBpedia lookup returned no relevant results. "
                 "Please generate an AI-based answer instead and mark it as AI-generated. "
                 "Follow the system prompt."
             )
-            history.append({
-                "role": "tool",
-                "name": "dbpedia_lookup",
-                "content": fallback
-            })
         else:
             reminder = (
                 "Here are the top 3 DBpedia lookup results. "
@@ -125,14 +108,41 @@ async def main(message: cl.Message):
                 "follow the system prompt (use dbo:abstract as main source for your answer, "
                 "enrich the answer with the top 3 values of the further 5 properties of the selected entity)."
             )
-            history.append({
-                "role": "tool",
-                "name": "dbpedia_lookup",
-                "content": f"{reminder}\n\nResults:\n{result}"
-            })
+            tool_content = f"{reminder}\n\nResults:\n{result}"
+
+        # Rebuild clean conversation for follow-up
+        followup_messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": message.content},
+            {
+                "role": "assistant",
+                "content": "",
+                "tool_calls": [
+                    {
+                        "id": call_id,
+                        "type": "function",
+                        "function": {
+                            "name": "dbpedia_lookup",
+                            "arguments": json.dumps(args)
+                        }
+                    }
+                ]
+            },
+            {"role": "tool", "tool_call_id": call_id, "content": tool_content}
+        ]
+
+        # Second pass: model generates final answer with tool results
+        followup_stream = await client.chat.completions.create(
+            messages=followup_messages,
+            stream=True,
+            **settings
+        )
+        async for chunk in followup_stream:
+            choice = chunk.choices[0]
+            if token := choice.delta.content:
+                assistant_reply += token
+                await msg.stream_token(token)
+            if choice.finish_reason:
+                break
 
     await msg.update()
-
-    # Save assistant reply
-    history.append({"role": "assistant", "content": assistant_reply})
-    cl.user_session.set("history", history)
