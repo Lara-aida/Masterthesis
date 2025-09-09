@@ -5,7 +5,7 @@ a.	First, open DBpedia lookup and search for the nouns of the user query (semant
 b.	Out of the top 3 search results select the one with the highest relevance to the user query and chat history. (Choose the first ranked unless clearly irrelevant.)
 2.	Information retrieval:
 a.	Use the value of dbo:abstract from the selected entity as the main source for your answer.
-b.	Then check the first 5 properties after dbo:abstract for further relevant information. Ignore properties such as dbo:thumbnail, dbo:wikiPageID, dbo:wikiPageLength, dbo:wikiPageRevisionID. 
+b.	Then check the 5 further properties except dbo:abstract for further relevant information. Ignore properties such as dbo:thumbnail, dbo:wikiPageID, dbo:wikiPageLength, dbo:wikiPageRevisionID. 
 c.	Out of the resulting first 5 properties select up to three values that best match the user query.
 3.	Fallback:
 a.	If no relevant DBpedia entity is found, provide an AI-generated answer and mark it as AI-generated.
@@ -40,7 +40,7 @@ Assistant:
 4.	selects first entry due to highest similarity to the user query, 
 5.	scans dbo:abstract World War II - http://dbpedia.org/resource/World_War_II of for information that answers the query, 
 6.	summarizes relevant parts of dbo:abstract
-7.	select the top 3 values of the first 5 properties after dbo:abstract, e.g., 
+7.	select the top 3 values of 5 further properties except dbo:abstract, e.g., 
 a.	Allies (https://dbpedia.org/page/World_War_II), 
 b.	dbr:Adolf Hitler (http://dbpedia.org/resource/Adolf_Hitler),
 c.	dbt:Battle_of_Gabon (http://dbpedia.org/resource/Battle_of_Gabon).

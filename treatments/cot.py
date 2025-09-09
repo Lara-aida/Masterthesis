@@ -13,7 +13,7 @@ client = AsyncOpenAI(api_key=api_key_GPT)
 settings = {
     "model": "gpt-4.1-mini-2025-04-14",
     "temperature": 0,
-    "max_completion_tokens": 425,
+    "max_completion_tokens": 525,
     "response_format": {"type": "text"},
     "tools": [],
     "tool_choice": "auto"
