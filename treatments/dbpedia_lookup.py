@@ -31,7 +31,7 @@ async def dbpedia_lookup(query: str, max_results: int = 3):
                 })
 
         if not docs:
-            return json.dumps({"error": "No DBpedia result."})
+            return json.dumps({"error": "No DBpedia result"})
 
         # 🔎 Debug: Show what DBpedia returned
         print("[DEBUG] Lookup returned the following entities:")

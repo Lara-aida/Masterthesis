@@ -40,10 +40,9 @@ settings = {
 
 @cl.on_message
 async def main(message: cl.Message):
-    # First call: model may request a tool
     init_messages = [
         {"role": "system", "content": system_prompt},
-        {"role": "user", "content": message.content}
+        {"role": "user", "content": message.content},
     ]
 
     stream = await client.chat.completions.create(
@@ -53,96 +52,108 @@ async def main(message: cl.Message):
     )
 
     msg = await cl.Message(content="").send()
-    assistant_reply = ""
-    pending_tool_calls = {}
+
+    # Accumulate streamed tool calls by their CHOICE INDEX (stable across deltas)
+    pending_tool_calls = {}  # idx -> {"id": None|str, "name": None|str, "arguments": str}
+    assistant_text = ""
 
     async for chunk in stream:
         choice = chunk.choices[0]
+        delta = choice.delta
 
-        # Capture tool calls
-        if choice.delta.tool_calls:
-            for tool_call in choice.delta.tool_calls:
-                call_id = tool_call.id
-                if call_id not in pending_tool_calls:
-                    pending_tool_calls[call_id] = {
-                        "name": tool_call.function.name,
-                        "arguments": ""
-                    }
-                if tool_call.function.arguments:
-                    pending_tool_calls[call_id]["arguments"] += tool_call.function.arguments
-                    print("Tool call ongoing...")
+        # stream any plain text tokens the model emits before tools
+        if delta.content:
+            assistant_text += delta.content
+            await msg.stream_token(delta.content)
 
-        # Stream any plain text tokens (in case model responds directly)
-        if token := choice.delta.content:
-            assistant_reply += token
-            await msg.stream_token(token)
+        # accumulate tool calls by 'index'; append argument chunks
+        if delta.tool_calls:
+            for tc in delta.tool_calls:
+                idx = tc.index  # stable int across deltas for the same tool call
+                slot = pending_tool_calls.setdefault(idx, {"id": None, "name": None, "arguments": ""})
+                if getattr(tc, "id", None):
+                    slot["id"] = tc.id
+                if getattr(tc, "function", None):
+                    if getattr(tc.function, "name", None):
+                        slot["name"] = tc.function.name
+                    if getattr(tc.function, "arguments", None):
+                        slot["arguments"] += tc.function.arguments
 
-        if choice.finish_reason:
-            break
+    # If the model answered directly - it ends here
+    if not pending_tool_calls:
+        await msg.update()
+        return
 
-    # Process tool calls
-    for call_id, call in pending_tool_calls.items():
+    # Process the tool call
+    for idx, slot in sorted(pending_tool_calls.items()):
+        # Parse arguments after full stream - as a JSON
         try:
-            args = json.loads(call["arguments"])
-            print("Parsed tool args:\n" + json.dumps(args, indent=2))
+            args = json.loads(slot["arguments"] or "{}")
         except json.JSONDecodeError:
             args = {}
-            print("Failed to parse tool arguments")
 
-        query = args.get("query")
-        max_results = args.get("max_results", 3)
+        # if model didn't pass 'query', fall back to user's message
+        query = args.get("query") or message.content
+        max_results = int(args.get("max_results", 3))
 
-        print(f"Calling dbpedia_lookup with query={query}, max_results={max_results}")
+        # Call your tool
         result = await dbpedia_lookup(query, max_results)
 
-        if "error" in result.lower() or "No DBpedia result" in result:
-            tool_content = (
-                "DBpedia lookup returned no relevant results. "
-                "Please generate an AI-based answer instead and mark it as AI-generated. "
-                "Follow the system prompt."
-            )
-        else:
-            reminder = (
-                "Here are the top 3 DBpedia lookup results. "
-                "Select the most relevant entity, "
-                "follow the system prompt (use dbo:abstract as main source for your answer, "
-                "enrich the answer with the top 3 values of the further 5 properties of the selected entity)."
-            )
-            tool_content = f"{reminder}\n\nResults:\n{result}"
+        # Decide success vs fallback
+        ok = bool(result) and ("error" not in result.lower()) and ("No DBpedia result" not in result)
 
-        # Rebuild clean conversation for follow-up
-        followup_messages = [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": message.content},
-            {
-                "role": "assistant",
-                "content": "",
-                "tool_calls": [
-                    {
-                        "id": call_id,
-                        "type": "function",
-                        "function": {
-                            "name": "dbpedia_lookup",
-                            "arguments": json.dumps(args)
+        if ok:
+            # Build the tool result message the model can read
+            try:
+                dbp_json = json.loads(result)
+            except Exception:
+                dbp_json = {"raw": result}
+
+            tool_content = json.dumps({"dbpedia_results": dbp_json})
+            call_id = slot["id"] or f"tool_{idx}"  # FIX (2): ensure a string id
+
+            followup_messages = [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": message.content},
+                {
+                    "role": "assistant",
+                    "content": "",
+                    "tool_calls": [
+                        {
+                            "id": call_id,
+                            "type": "function",
+                            "function": {
+                                "name": slot["name"] or "dbpedia_lookup",
+                                "arguments": json.dumps({"query": query, "max_results": max_results})
+                            }
                         }
-                    }
-                ]
-            },
-            {"role": "tool", "tool_call_id": call_id, "content": tool_content}
-        ]
+                    ]
+                },
+                {"role": "tool", "tool_call_id": call_id, "content": tool_content}
+            ]
 
-        # Second pass: model generates final answer with tool results
-        followup_stream = await client.chat.completions.create(
+            followup_cfg = {**settings}  # keep tools enabled for this path
+
+        else:
+            # fallback — disable tools so it won't try to call again
+            followup_messages = [
+                {"role": "system",
+                 "content": system_prompt + "\n(Note: No DBpedia entity found. Answer yourself without tools. Mark it with AI-generated.)"},
+                {"role": "user", "content": message.content}
+            ]
+            followup_cfg = {**settings, "tools": [], "tool_choice": "none"}
+
+        followup_resp = await client.chat.completions.create(
             messages=followup_messages,
-            stream=True,
-            **settings
+            stream=False,
+            **followup_cfg
         )
-        async for chunk in followup_stream:
-            choice = chunk.choices[0]
-            if token := choice.delta.content:
-                assistant_reply += token
-                await msg.stream_token(token)
-            if choice.finish_reason:
-                break
+
+        final_text = followup_resp.choices[0].message.content or ""
+        if final_text:
+            await msg.stream_token(final_text)
+
+        # one tool call per turn—break to avoid duplicate answers
+        break
 
     await msg.update()
