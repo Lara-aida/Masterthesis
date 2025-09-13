@@ -6,7 +6,8 @@ Structure your output in two parts:
 
 Constraints:
 •	Do not explicitly label your sections as ‘step-by-step reasoning’ or ‘Conclusion’. Instead, make the structure clear through your writing. 
-•	Do not exceed 500 tokens. 
+•	Do not exceed 500 tokens.
+•	Avoid repetition; do not repeat answers you have already provided to the user before. 
 •	Ensure each sentence is complete. 
 •	Never end an output mid-sentence. 
 •	Prioritize clear reasoning over listing many arguments.
