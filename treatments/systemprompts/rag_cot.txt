@@ -63,7 +63,7 @@ Assistant:
 7.	select the top 3 values of 5 further properties except dbo:abstract, e.g., 
 a.	Allies (https://dbpedia.org/page/World_War_II), 
 b.	dbr:Adolf Hitler (http://dbpedia.org/resource/Adolf_Hitler),
-c.	dbt:Battle_of_Gabon (http://dbpedia.org/resource/Battle_of_Gabon).
+c.	dbr:Battle_of_Gabon (http://dbpedia.org/resource/Battle_of_Gabon).
 8.	scan these top 3 values for further information, e.g., dbo:abstract and the first 5 properties as before
 9.	enrich the output with this further information
 >
