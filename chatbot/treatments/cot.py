@@ -2,10 +2,10 @@ import chainlit as cl
 from openai import AsyncOpenAI
 
 # Load API key from file
-with open("/Users/lara-aidajopp/Documents/Programming_Stuff/Universität Mannheim/Masterthesis/api-key-GPT.txt") as f:
+with open("/Users/lara-aidajopp/Documents/Programming_Stuff/Universität Mannheim/Masterthesis/chatbot/api-key-GPT.txt") as f:
     api_key_GPT = f.read().strip()
 
-with open ("/Users/lara-aidajopp/Documents/Programming_Stuff/Universität Mannheim/Masterthesis/treatments/systemprompts/cot.txt") as s:
+with open ("/Users/lara-aidajopp/Documents/Programming_Stuff/Universität Mannheim/Masterthesis/chatbot/treatments/systemprompts/cot.txt") as s:
     system_prompt = s.read()
 
 client = AsyncOpenAI(api_key=api_key_GPT)

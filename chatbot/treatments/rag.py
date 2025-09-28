@@ -4,11 +4,11 @@ from dbpedia_lookup import dbpedia_lookup
 import json
 
 # Load API key from file
-with open("/Users/lara-aidajopp/Documents/Programming_Stuff/Universität Mannheim/Masterthesis/api-key-GPT.txt") as f:
+with open("/Users/lara-aidajopp/Documents/Programming_Stuff/Universität Mannheim/Masterthesis/chatbot/api-key-GPT.txt") as f:
     api_key_GPT = f.read().strip()
 
 # Load system prompt
-with open("/Users/lara-aidajopp/Documents/Programming_Stuff/Universität Mannheim/Masterthesis/treatments/systemprompts/rag.txt") as s:
+with open("/Users/lara-aidajopp/Documents/Programming_Stuff/Universität Mannheim/Masterthesis/chatbot/treatments/systemprompts/rag.txt") as s:
     system_prompt = s.read()
 
 client = AsyncOpenAI(api_key=api_key_GPT)
