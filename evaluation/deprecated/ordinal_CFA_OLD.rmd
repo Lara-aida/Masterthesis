@@ -1,0 +1,168 @@
+---
+title: "ordinal_CFA_OLD"
+output: html_notebook
+---
+
+This is the evaluation of the experiment's results. The focus of this notebook is on ordinal confirmatory factor analysis in preparation of (M)ANOVA.
+Test
+This notebook expands the master thesis by data analysis and respective code as well as short explanations. This markdown does not replace the thesis, it serves solely as an appendix.
+
+<h1>Library Downloads</h1>
+```{r}
+library(tidyverse)
+library(broom)
+library(ggplot2)
+library(dplyr)
+library(finalfit)
+library(mice)
+library(MASS)
+library(lavaan)
+library(semptools)
+library(psych)
+library(corrplot)
+```
+
+<h1>Sample Load</h1>
+First, the previously imputed sample is loaded as a mids object:
+
+```{r}
+getwd()
+final_imputed_dataset <- read_csv("../data/mi_dataset.csv")
+view(final_imputed_dataset)
+```
+
+As the imputed dataset depict the items as unordered <dbl> objects, they must be transformed into ordered factors again to depict the ordinal scale attribute in a correct fashion.
+
+```{r}
+relevant_columns <- c("AC01_01", "AC01_02", "AC01_03", "DI01_01", "DI01_02", "DI01_03", "DI01_04", "UI01_01", "UI01_02", "UI01_03", "UI01_04", "EX01_01", "EX01_02", "EX01_03", "EX01_04")
+
+dataset_for_ordinal_CFA <- final_imputed_dataset %>%
+  mutate(
+    across(all_of(relevant_columns), as.factor)
+  )
+
+dataset_for_ordinal_CFA <- dataset_for_ordinal_CFA %>%
+  mutate(
+    across(
+      all_of(relevant_columns), ~ordered(., levels = 1:5)
+    )
+  )
+
+
+glimpse(dataset_for_ordinal_CFA)
+```
+
+As this version of the imputed dataset still contains NA values, all rows with NA values are dropped for the following observations. The missingness of this data is still represented through the multiple imputation which represents the uncertainty as outlined, previously (Li, Stuart and Allison, 2015).
+
+```{r}
+dataset_for_ordinal_CFA <- final_imputed_dataset %>%
+  drop_na()
+
+glimpse(dataset_for_ordinal_CFA)
+```
+
+
+<h1>Ordinal CFA</h1>
+
+In order to conduct the ordinal CFA, the following sequence of steps is applied and analyzed:
+
+<ol>
+<li>Polychoric Correlation Matrix</li>
+<li>Initial Ordinal CFA</li>
+<li>Analysis of parameters and goodness-of-fit indices followed by model adjustments</li>
+<li>Path diagram</li>
+</ol>
+
+<h2>Polychoric Correlation Matrix</h2>
+
+In the following the polychoric correlation matrix is interpreted. The Pearson correlation coefficients are not used since we are analyzing the item response format of an ordinal scale, i.e., on a micro-level, where parametric techniques do not apply (Cleff, 2019; Carifio and Perla, 2007). This is underpinned by the violated assumption of Pearson that requires metric scales and linear relationships which are not prevalent due to the response-level analysis (Cleff, 2019).
+
+However, the data of the relevant correlation features must be extracted first, i.e., the items we want to conduct in the CFA.
+
+```{r}
+item_data = dataset_for_ordinal_CFA[c(relevant_columns)]
+glimpse(item_data)
+```
+
+To analyze the relationship between ordinal variables, Spearman's Rho is calculated (Cleff, 2019). First, the polychoric correlation is applied to the item data. 
+
+```{r}
+#Polychoric correlation
+polychoric_cor = polychoric(item_data)
+
+#
+rho = polychoric_cor$rho
+save(rho, file = "polychoric")
+```
+
+Subsequently, Spearman's Rho is analyzed using the correlation matrix below.
+
+```{r fig.width=8, fig.height=8}
+corrplot(polychoric_cor$rho, method = 'circle', type = 'lower', insig='blank', addCoef.col ='black', number.cex = 0.9, tl.col = 'black', tl.cex = 0.9)
+```
+
+At a first glance, the relationships between DI01_03 and DI01_02, EX01_04 and DI01_02 as well as EX01_04 and DI01_03 are significant. All those are close to + 1 indicating a monotonic, positive relationship, i.e., is one of the items in the relationship has a high rating (close to 5), the other one has a high rating, too.
+
+As four factors: accountability, disclosure, usefulness of information and explainability emerged upon literature, the items of each factor should have a moderate correlation. This can be inspected by a stair-like blue pattern of almost all correlations between the items of the same dimension, e.g., AC01_01 - AC01_03. Especially for the accountability and disclosure factor the blue steps of the stair can be observed. In contrast, in most parts the correlation between items of different factors is rather low except for the items of usefulness and explainability which have both a moderate correlation around 0.5 with accountability items and disclosure items.
+
+However, not all items of one dimension have a high correlation with one another. In light of this, it has to be considered that the treatments impact the correlation, too. As the different treatments aim to steer different behaviour against the backdrop of transparency and thus, do not always aim to achieve a high score across all items of a factor. For instance, UI01_04 has a rather low even negative correlation with UI01_01 and UI01_02. While the Chain-of-Thought-based treatments aim to actively interact with the user, Vanilla- and RAG-based treatments do not actively aim for an interaction but still explain the most important points.
+
+<h2>Ordinal CFA with WLMSV and MPlus</h2>
+As we have inspected the polychoric correlation between the items of each factor, we aim to check the item assignment to factors using an ordinal CFA (Brown, 2015). Thus, we aim to reject the hypothesis of:
+
+H0: The items do not load on their assigned factors and the factors do not covary (Kline, 2016).
+
+Since we are conducting ordinal variables in their response format (Carifio and Perla, 2007), with a rather small sample we use the robust "Weighted Least Square Means and Variances" estimator (WLSMV) (Brown, 2015; Bean, 2021). In the following the factor loadings for the four based upon literature defined factors of accountability, disclosure, usefulness, and explainability are examined.
+
+```{r}
+transparency <- 
+" accountability =~ AC01_01 + AC01_02 + AC01_03 
+disclosure =~ DI01_01 + DI01_02 + DI01_03 + DI01_04 
+usefulness =~ UI01_01 + UI01_02 + UI01_03 + UI01_04 
+explainability =~ EX01_01 + EX01_02 + EX01_03 + EX01_04 "
+
+ordinal_CFA1 <- cfa(transparency, data=item_data, estimator = "WLSMV", mimic = "MPlus", std.lv = TRUE, ordered = TRUE)
+```
+
+The warning outlined above as a consequence of the first ordinal_CFA indicates that the covariance matrix in a non-positive definite. However, "the input variance-covariance matrix and the model-implied variance-covariance matrix are" (Brown, 2015, p. 162) required to be positive definite for analyzing the factor loadings correctly (Brown, 2015; Kline, 2016). Consequently, we follow the warning's advice to investigate the covariances of the factors.
+
+```{r}
+lavInspect(ordinal_CFA1, "cov.lv")
+```
+
+At a first glance, we can see that the factors of accountability and usefulness as well as disclosure and explainability have a high covariance. This has already been noted before for the polychoric correlation matrix whereas items of assigned to these factors had high correlations across factors. Brown (2016) suggests that if "a factor correlation [..] exceeds .80 or .85 [...] poor discriminant validity" [p. 116] is prevalent. Since this is the case accountability and usefulness as well as disclosure and explainability should potentially be collapsed into one factor each. Subsequently and to further clarify on the non-positive definiteness, we are validating the eigenvalues in line with Kline (2016).
+
+```{r}
+eigenvalues = eigen(lavInspect(ordinal_CFA1, "cov.lv"))$values
+print(eigenvalues)
+
+percentage_explained = eigenvalues/sum(eigenvalues)
+print(percentage_explained)
+
+```
+
+First, the negative eigenvalue of ≈-0.0714 explains the non-positive definiteness warning (Kline, 2016). Moreover, the Kaiser criterion which is widely used to define the amount of factors in exploratory factor analysis underlines the need of collapsing the four factors into two factors as only factors with an eigenvalue > 1 are considered relevant (Cleff, 2019). Thus, the model is respecified in line with Kline (2016) and two new factor are delineated for:
+
+<ul>
+<li>Accountability x Usefulness -> Factual Transparency,</li>
+<li>Disclosure x Explainability -> Revealing Transparency.</li>
+</ul>
+
+Due to a rather low correlation with the items of their new factors, DI01_01 and UI01_04 are assigned to their opposite factor.
+
+```{r}
+transparency <- 
+" factual =~ AC01_01 + AC01_02 + AC01_03 + UI01_01 + UI01_02 + UI01_03 + DI01_01
+revealing =~ DI01_02 + DI01_03 + DI01_04 + EX01_01 + EX01_02 + EX01_03 + EX01_04 + UI01_04"
+
+ordinal_CFA2 <- cfa(transparency, data=item_data, estimator = "WLSMV", mimic = "MPlus", std.lv = TRUE, ordered = TRUE)
+```
+
+In the following, we are examining the goodness-of-fit indices such as chi-square, CFI, TLI, RMSEA, and SRMR (Brown, 2015), as well as the model parameter's such as factor loadings to assess if further adjustments to the model are required.
+
+```{r}
+summary(ordinal_CFA2, standardized = TRUE, fit.measures = TRUE)
+```
+
+xxxxx
+

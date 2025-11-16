@@ -1,0 +1,42 @@
+---
+title: "MANOVA"
+output: html_document
+date: "2025-11-16"
+---
+
+This is the evaluation of the experiment's results. The focus of this notebook is on answering the research question by conducting a multivariate analysis of variance (MANOVA) on the foundation of the measurement model which has been validated previously using an ordinal confirmatory factor analysis (CFA).
+
+This notebook expands the master thesis by data analysis and respective code as well as short explanations. This markdown does not replace the thesis, it serves solely as an appendix.
+
+<h1>Library Downloads</h1>
+```{r}
+library(tidyverse)
+library(broom)
+library(ggplot2)
+library(dplyr)
+library(finalfit)
+library(mice)
+library(miceadds)
+library(MASS)
+library(lavaan)
+library(lavaan.mi)
+library(semptools)
+library(semTools)
+library(psych)
+library(corrplot)
+```
+
+<h1>Sample Load</h1>
+First, the previously imputed data is loaded as a mids object:
+
+```{r}
+getwd()
+final_imputed_data <- read_rds("data/mi_mids_object.rds")
+glimpse(final_imputed_data)
+```
+
+
+
+
+
+
