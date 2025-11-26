@@ -122,7 +122,7 @@ For the calculation of median, mode and min/max values, Rubin's rules of pooling
 treatments = c(1:4)
 relevant_vars = c("AC01_SCORE", "UI01_SCORE", "DI01_SCORE", "EX01_SCORE")
 
-descriptive_stats <- map_dfr(1:4, function(treatment) {
+initial_descriptive_stats <- map_dfr(1:4, function(treatment) {
   
   treatment_subset <- lapply(
     list_factor_mean_cols, 
@@ -154,69 +154,46 @@ descriptive_stats <- map_dfr(1:4, function(treatment) {
   treatment_subset_combined <- bind_rows(treatment_subset)
   glimpse(treatment_subset_combined)
   
-  # Calculate median, mode, max, min value
-  treatment_median_mode_min_max <- treatment_subset_combined %>% 
+  # Calculate median value
+  treatment_median <- treatment_subset_combined %>% 
     summarise(
       across(
-        all_of(relevant_vars),
-        list(
-          median = ~median(.x),
-          mode = ~Mode(.x),
-          min_value = ~min(.x),
-          max_value = ~max(.x)
-          )
+        all_of(relevant_vars), list(median = ~median(.x))
       )
     )
+    transponed_median <- as.data.frame(t(treatment_median))
+    colnames(transponed_median) <- c("treatment_median")
   
-  # Calculate median, mode, max, min value
-  treatment_median_mode_min_max <- treatment_subset_combined %>% 
+  # Calculate mode value
+  treatment_mode <- treatment_subset_combined %>% 
     summarise(
       across(
-        all_of(relevant_vars),
-        list(
-          median = ~median(.x),
-          mode = ~Mode(.x),
-          min_value = ~min(.x),
-          max_value = ~max(.x)
-          )
+        all_of(relevant_vars), list(mode = ~Mode(.x))
       )
     )
+    transponed_mode <- as.data.frame(t(treatment_mode))
+    colnames(transponed_mode) <- c("treatment_mode")
   
-  # Calculate median, mode, max, min value
-  treatment_median_mode_min_max <- treatment_subset_combined %>% 
+  
+  # Calculate min value
+  treatment_min <- treatment_subset_combined %>% 
     summarise(
       across(
-        all_of(relevant_vars),
-        list(
-          median = ~median(.x),
-          mode = ~Mode(.x),
-          min_value = ~min(.x),
-          max_value = ~max(.x)
-          )
+        all_of(relevant_vars), list(min_value = ~min(.x))
       )
     )
+    transponed_min <- as.data.frame(t(treatment_min))
+    colnames(transponed_min) <- c("treatment_min")
   
-  # Calculate median, mode, max, min value
-  treatment_median_mode_min_max <- treatment_subset_combined %>% 
+  # Calculate max value
+  treatment_max <- treatment_subset_combined %>% 
     summarise(
       across(
-        all_of(relevant_vars),
-        list(
-          median = ~median(.x),
-          mode = ~Mode(.x),
-          min_value = ~min(.x),
-          max_value = ~max(.x)
-          )
+        all_of(relevant_vars), list(max_value = ~max(.x))
       )
     )
-  
-  glimpse(treatment_median_mode_min_max)
-  
-  transponed_median_mode_min_max <- as.data.frame(t(treatment_median_mode_min_max))
-  rownames(transponed_median_mode_min_max) <- colnames(treatment_median_mode_min_max)
-  transponed_median_mode_min_max$V2 <- NULL
-  
-  glimpse(transponed_median_mode_min_max)
+    transponed_max <- as.data.frame(t(treatment_max))
+    colnames(transponed_max) <- c("treatment_max")
   
   # Transforming metrics into the output format of a df
   output_mean <- as.data.frame(treatment_mean)
@@ -227,24 +204,25 @@ descriptive_stats <- map_dfr(1:4, function(treatment) {
   output_treatment_se <- as.data.frame(treatment_se)
   output_treatment_lower_CI <- as.data.frame(treatment_lower_CI)
   output_treatment_higher_CI <- as.data.frame(treatment_higher_CI)
-  #output_median_mode_min_max <- as.data.frame(transponed_median_mode_min_max)
-  
+
   # Combining the output
-  output <- cbind(output_mean, output_sd, output_var, output_n, output_treatment_se, output_treatment_lower_CI, output_treatment_higher_CI)
+  output <- cbind(output_mean, output_sd, output_var, output_n, output_treatment_se, output_treatment_lower_CI, output_treatment_higher_CI, transponed_median, transponed_mode, transponed_min, transponed_max)
   output$TR01 <- treatment
   
   output
   
 })
 
- descriptive_stats
+initial_descriptive_stats
 
 ```
 
-Additionally, the further metrics such as SE and CI intervals are determined on the basis of averaging the list of imputed datasets and ... (ignoring SEs of imputation?)
-
+The above calculated table has to be cleaned up for interpretation and for depicting the boxplots by treatment and factor.
 
 ```{r}
+descriptive_stats <- as.data.frame(initial_descriptive_stats)
+descriptive_stats <- dplyr::select(descriptive_stats, -13)
+
 view(descriptive_stats)
 ```
 
