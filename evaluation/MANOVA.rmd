@@ -1,10 +1,9 @@
 ---
 title: "MANOVA"
-output: html_document
-date: "2025-11-16"
+output: html_notebook
 ---
 
-This is the evaluation of the experiment's results. The focus of this notebook is on answering the research question by conducting a multivariate analysis of variance (MANOVA) on the foundation of the measurement model which has been validated previously using an ordinal confirmatory factor analysis (CFA).
+This is the evaluation of the experiment's results. The focus of this notebook is on answering the research question by conducting a factorial multivariate analysis of variance (MANOVA) on the foundation of the measurement model which has been validated previously using an ordinal confirmatory factor analysis (CFA).
 
 This notebook expands the master thesis by data analysis and respective code as well as short explanations. This markdown does not replace the thesis, it serves solely as an appendix.
 
@@ -24,9 +23,12 @@ library(semptools)
 library(semTools)
 library(psych)
 library(corrplot)
+library(purrr)
+library(TAM)
+library(DescTools)
 ```
 
-<h1>Sample Load</h1>
+<h1>Sample Load and Data Preparation</h1>
 First, the previously imputed data is loaded as a mids object:
 
 ```{r}
@@ -35,8 +37,248 @@ final_imputed_data <- read_rds("data/mi_mids_object.rds")
 glimpse(final_imputed_data)
 ```
 
+As MANOVA is a parametric method that is applied to analyze differences between multiple, continuous dependent variables, the means for each factor of the four factors are calculated first (Kang and Jin, 2016). Although, the calculation of the mean on the basis of an ordinal scale necessitates "a collection of purposefully constructed items" [p. 109] on the macro scale (Carifio and Perla, 2007). On the basis of this measurement scale perspective, means as parametric statistical structures can be constructed on the foundation of the items assigned to the purposeful factors (Carifio and Perla, 2007). These factors are verified in their purpose through the previously conducted ordinal CFA. Consequently, the following measurement model serves as a basis for the following mean calculation per factor:
+
+<ul>
+<li>Accountability: AC01_01, AC01_02, AC01_03</li>
+<li>Disclosure: DI01_02 + DI01_03 + DI01_04 + EX01_04</li>
+<li>Usefulness: UI01_01, UI01_02 </li>
+<li>Explainability: EX01_02 + EX01_03 + UI01_04.</li>
+</ul>
+
+First, the items of the measurement model and the treatment variable TR01, which depicts the independent variable (Kaltenbach, 2021), must be extracted of the imputed data:
+
+```{r}
+factor_relevant_cols <- c("AC01_01", "AC01_02", "AC01_03", 
+                             "DI01_02", "DI01_03", "DI01_04", "EX01_04",
+                             "UI01_01", "UI01_02", 
+                             "EX01_02", "EX01_03", "UI01_04")
+treatment_col <- c("TR01")
+total_cols <- c(factor_relevant_cols, treatment)
+
+list_of_fac_rel_cols <- lapply(complete(final_imputed_data, "all"), function(df) df[, total_cols])
+
+glimpse(list_of_fac_rel_cols)
+```
+
+In addition, four new columns are introduced for each factor in which the calculated mean is stored for each imputed dataset. These four resulting additional variables depicted as value columns are the dependent variables to be conducted (Kang and Jin, 2016; Kaltenbach, 2021):
+
+```{r}
+list_factor_mean_cols <- lapply(list_of_fac_rel_cols, function(df) {
+    df %>%
+      mutate(
+        across(all_of(factor_relevant_cols), ~as.integer(.x)),
+        AC01_SCORE = round(rowMeans(across(c("AC01_01", "AC01_02", "AC01_03")), na.rm = TRUE), 2),
+        DI01_SCORE = round(rowMeans(across(c("DI01_02", "DI01_03", "DI01_04", "EX01_04")), na.rm = TRUE), 2),
+        UI01_SCORE = round(rowMeans(across(c("UI01_01", "UI01_02")), na.rm = TRUE), 2),
+        EX01_SCORE = round(rowMeans(across(c("EX01_02", "EX01_03", "UI01_04")), na.rm = TRUE), 2),
+        across(all_of(factor_relevant_cols), ~as.ordered(.x)),
+        across(all_of(treatment_col), ~as.factor(.x))
+      )
+})
+glimpse(list_factor_mean_cols)
+```
+
+This by means expanded list of the imputed factor items has to be transformed back into an mids object for the latter post-check factorial ANOVA which can be applied to mira objects (Robitzsch et al., 2025). As stated before for the ordinal CFA, using the mids object ensures that the standard errors as well as further statistical measures influenced by multiple imputation are considered in terms of a mira object (Van Buuren, 2011).
+
+```{r}
+mids_factor_mean_cols <- datlist2mids(list_factor_mean_cols)
+glimpse(mids_factor_mean_cols)
+```
+
+<h1>Descriptive Statistics</h1>
+Before starting the MANOVA analysis, the initial step relies in analyzing the descriptive statistics (Kang and Jin, 2016). We assume a significance level alpha of 0.05. In the following, we start with depicting a table that contains descriptive information of each factor:
+<ul>
+<li>General information: sample size (N),</li>
+<li>Central tendency information and central dispersion:
+<ul>
+<li>mean,</li>
+<li>lower and upper confidence interval (CI) of the mean,</li>
+<li>median,</li>
+<li>standard error (SE),</li>
+</ul>
+</li>
+<li>Further dispersion information:
+<ul>
+<li>standard deviation (SD),</li>
+<li>variance,</li>
+<li>median,</li>
+<li>the minimum and maximum value.</li>
+</ul>
+</li>
+</ul>
+
+The metrics are determined in two steps in order to take the properties of the imputed data into account. Whereas the N of each treatment can be determined by simply counting the rows of a treatment, the mean and SD are ascertained by using a method of the "miceadds" package that allows to directly calculate these metrics on the foundation of imputed data (Robitzsch et al., 2025). Mean and SD establish the ground for further metric calculations, i.e., the second step. 
+
+The variance is calculated on the basis of the SD as the SD is the quadratic square root of the variance. Moreover, the SE is calculated by dividing the SD by the square root of a treatment's N. The lower and upper confidence intervals can be ascertained by subtracting/adding the multiplication of the z-scores of "the 2.5% and 97.5% quantiles of a standard normal distribution [+- 1.96]" (Kaltenbach, 2021, p. 25) with the SE. (Kaltenbach, 2021)
+
+Furthermore, two additional central tendency metrics are calculated: median and mode. The median "splits the distribution in half [...] [with a 50 %] chance of a random value [...] occurring above or below the median." (Seltman, 2018, p. 37). Even though this is a common metric, the mean is the more frequently used metric for central tendency depicting the "(expected value) of a random variable" (Seltman, 2018, p. 37). In contrast to these two metrics, the mode as "the most [...] frequently occurring value" (Seltman, 2018, p. 68) is rather seldom used in practice. All these metrics establish a holistic picture on each treatments central tendency and thus, are calculated below. (Seltman, 2018)
+
+The minimum and maximum values of each treatment are also provided to show the maximum the dispersion of values.
+
+For the calculation of median, mode and min/max values, Rubin's rules of pooling are not considered as no predefined function that takes imputed data properties into account is used (Van Buuren, 2011), e.g., as functions of the "miceadds" package (Robitzsch et al., 2025). But as those metrics are only used for interpreting the descriptive statistics and not ongoingly, this limitation is acknowledged and accepted. The metrics are calculated for a combined dataset consisting of all rows of each imputed dataset for each treatment, i.e., if a treatment occurs 36 times, it has 36 rows per imputed dataset - as 10 imputed datasets are constructed, 360 rows are considered for median, mode, min/max calculation.
+
+```{r}
+treatments = c(1:4)
+relevant_vars = c("AC01_SCORE", "UI01_SCORE", "DI01_SCORE", "EX01_SCORE")
+
+descriptive_stats <- map_dfr(1:4, function(treatment) {
+  
+  treatment_subset <- lapply(
+    list_factor_mean_cols, 
+    function(df) df %>%
+      dplyr::filter(TR01 == treatment) %>%
+        dplyr::select(TR01, AC01_SCORE, UI01_SCORE, DI01_SCORE, EX01_SCORE)
+  )
+  
+  glimpse(treatment_subset)
+  
+  # Transforming the subset list into a mids for followup methods (ma.wtd.)
+  mids_treatment_subset <- datlist2mids(treatment_subset)
+  
+  # Checking the N
+  N_of_each_treatment_per_imp <- sapply(treatment_subset, nrow)
+  N_mean <- mean(N_of_each_treatment_per_imp)
+
+  # Determining the metrics
+  treatment_mean <- ma.wtd.meanNA(
+    mids_treatment_subset, vars = relevant_vars)
+  treatment_sd <- ma.wtd.sdNA(mids_treatment_subset, vars = relevant_vars)
+  treatment_var <- treatment_sd * treatment_sd
+  treatment_se <- treatment_sd / sqrt(N_mean)
+  treatment_lower_CI <- treatment_mean - 1.96 * treatment_se
+  treatment_higher_CI <- treatment_mean + 1.96 * treatment_se
+  
+  
+  # Combine all rows of each of the 10 imputed datasets into one dataset for each treatment to calculate median, mode, max, min value
+  treatment_subset_combined <- bind_rows(treatment_subset)
+  glimpse(treatment_subset_combined)
+  
+  # Calculate median, mode, max, min value
+  treatment_median_mode_min_max <- treatment_subset_combined %>% 
+    summarise(
+      across(
+        all_of(relevant_vars),
+        list(
+          median = ~median(.x),
+          mode = ~Mode(.x),
+          min_value = ~min(.x),
+          max_value = ~max(.x)
+          )
+      )
+    )
+  
+  # Calculate median, mode, max, min value
+  treatment_median_mode_min_max <- treatment_subset_combined %>% 
+    summarise(
+      across(
+        all_of(relevant_vars),
+        list(
+          median = ~median(.x),
+          mode = ~Mode(.x),
+          min_value = ~min(.x),
+          max_value = ~max(.x)
+          )
+      )
+    )
+  
+  # Calculate median, mode, max, min value
+  treatment_median_mode_min_max <- treatment_subset_combined %>% 
+    summarise(
+      across(
+        all_of(relevant_vars),
+        list(
+          median = ~median(.x),
+          mode = ~Mode(.x),
+          min_value = ~min(.x),
+          max_value = ~max(.x)
+          )
+      )
+    )
+  
+  # Calculate median, mode, max, min value
+  treatment_median_mode_min_max <- treatment_subset_combined %>% 
+    summarise(
+      across(
+        all_of(relevant_vars),
+        list(
+          median = ~median(.x),
+          mode = ~Mode(.x),
+          min_value = ~min(.x),
+          max_value = ~max(.x)
+          )
+      )
+    )
+  
+  glimpse(treatment_median_mode_min_max)
+  
+  transponed_median_mode_min_max <- as.data.frame(t(treatment_median_mode_min_max))
+  rownames(transponed_median_mode_min_max) <- colnames(treatment_median_mode_min_max)
+  transponed_median_mode_min_max$V2 <- NULL
+  
+  glimpse(transponed_median_mode_min_max)
+  
+  # Transforming metrics into the output format of a df
+  output_mean <- as.data.frame(treatment_mean)
+  glimpse(output_mean)
+  output_sd <- as.data.frame(treatment_sd)
+  output_var <- as.data.frame(treatment_var)
+  output_n <- as.data.frame(N_mean)
+  output_treatment_se <- as.data.frame(treatment_se)
+  output_treatment_lower_CI <- as.data.frame(treatment_lower_CI)
+  output_treatment_higher_CI <- as.data.frame(treatment_higher_CI)
+  #output_median_mode_min_max <- as.data.frame(transponed_median_mode_min_max)
+  
+  # Combining the output
+  output <- cbind(output_mean, output_sd, output_var, output_n, output_treatment_se, output_treatment_lower_CI, output_treatment_higher_CI)
+  output$TR01 <- treatment
+  
+  output
+  
+})
+
+ descriptive_stats
+
+```
+
+Additionally, the further metrics such as SE and CI intervals are determined on the basis of averaging the list of imputed datasets and ... (ignoring SEs of imputation?)
+
+
+```{r}
+view(descriptive_stats)
+```
 
 
 
 
+
+
+
+Plots
+
+
+
+
+
+<h1>Factorial MANOVA</h1>
+MANOVA
+
+
+
+<h1>Factorial ANOVA for each factor</h1>
+
+
+
+<h2>Factorial ANOVA for Accountability</h2>
+
+
+<h2>Factorial ANOVA for Disclosure</h2>
+
+<h2>Factorial ANOVA for Usefulness</h2>
+
+<h2>Factorial ANOVA for Explainability</h2>
+
+
+
+<h1>Concluding Remarks</h1>
 
