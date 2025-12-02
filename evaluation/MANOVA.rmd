@@ -26,6 +26,14 @@ library(corrplot)
 library(purrr)
 library(TAM)
 library(DescTools)
+library(gridExtra)
+library(cowplot)
+library(ggpubr)
+library(rstatix)
+library(mvnormalTest)
+library(biotools)
+library(car)
+library(effectsize)
 ```
 
 <h1>Sample Load and Data Preparation</h1>
@@ -74,41 +82,135 @@ list_factor_mean_cols <- lapply(list_of_fac_rel_cols, function(df) {
         EX01_SCORE = round(rowMeans(across(c("EX01_02", "EX01_03", "UI01_04")), na.rm = TRUE), 2),
         across(all_of(factor_relevant_cols), ~as.ordered(.x)),
         across(all_of(treatment_col), ~as.factor(.x))
-      )
+      ) %>%
+        rename(treatment = TR01)
 })
-glimpse(list_factor_mean_cols)
+
+list_factor_mean_cols
 ```
 
-This by means expanded list of the imputed factor items has to be transformed back into an mids object for the latter post-check factorial ANOVA which can be applied to mira objects (Robitzsch et al., 2025). As stated before for the ordinal CFA, using the mids object ensures that the standard errors as well as further statistical measures influenced by multiple imputation are considered in terms of a mira object (Van Buuren, 2011).
+For an improved clarity of the latter visual analysis of the descriptive statistics (boxplots) as well as the (M)ANOVA investigations, the treatment column is recoded (1 = Vanilla, 2 = CoT, 3 = RAG, 4 = CoTxRAG). Therefore, another list "analysis_list_factor_mean_cols" is created upon the by means expanded original list of imputed datasets "list_factor_mean_cols".
 
 ```{r}
-mids_factor_mean_cols <- datlist2mids(list_factor_mean_cols)
-glimpse(mids_factor_mean_cols)
+analysis_list_factor_mean_cols <- lapply(list_factor_mean_cols, function(df) {
+    df %>%
+        mutate(
+        treatment = case_match(
+          treatment, 
+          "1" ~ "Vanilla",
+          "2" ~ "CoT",
+          "3" ~ "RAG",
+          "4" ~ "CoTxRAG",
+          .default = as.character(treatment)
+          ),
+        treatment = factor(
+          treatment,
+          levels = c("Vanilla", "CoT", "RAG", "CoTxRAG")
+        )
+        )
+      
+})
+
+analysis_list_factor_mean_cols
+```
+
+This transformed and by means expanded list of the imputed factor items has to be transformed back into an mids object for the latter post-check factorial ANOVA which can be applied to mira objects (Robitzsch et al., 2025). As stated before for the ordinal CFA, using the mids object ensures that the standard errors as well as further statistical measures influenced by multiple imputation are considered in terms of a mira object (Van Buuren, 2011).
+
+```{r}
+mids_analysis_factor_mean_cols <- datlist2mids(analysis_list_factor_mean_cols)
+glimpse(mids_analysis_factor_mean_cols)
 ```
 
 <h1>Descriptive Statistics</h1>
-Before starting the MANOVA analysis, the initial step relies in analyzing the descriptive statistics (Kang and Jin, 2016). We assume a significance level alpha of 0.05. In the following, we start with depicting a table that contains descriptive information of each factor:
+Before starting the MANOVA analysis, the initial step relies in analyzing the descriptive statistics (Kang and Jin, 2016). First, boxplots are generated to establish a foundation for an advanced analysis using descriptive statistic measures such as mean and its lower and upper confidence intervals. This overall descriptive analysis lays the ground for the MANOVA analysis.
+
+<h2>Interpretating the Overall Tendency with Boxplots</h2>
+Boxplots are generated for pre-evaluating tendencies such as median differences among treatment groups (Von Eye and Wiedermann, 2023), which are deeper analyzed using the later on calculated descriptive static metrics, e.g., the mean. For clarity reasons, the list "analysis_list_factor_mean_cols" in which the treatment column is recoded (1 = Vanilla, ...) is used. 
+
+First, for each imputed dataset the plots are generated. However, to avoid analyzing 10 different but similar plots for each dependent variable, all 10 imputed datasets are summarized into one for a quick exploration. The resulting four summary boxplots are arranged and analyzed together. As the later depicted table serves as a more detailed descriptive statistic, the accompanying blurring of the boxplots is acknowledged and accepted. Moreover, boxplots are intended to explore the median, quartiles, minimum and maximum values and thus, the overall tendency of the data but not SEs and other statistical measures that are impacted by the procedure of multiple imputation (Van Buuren, 2011; Seltman, 2018).
+
+```{r}
+ac01_plot <- lapply(analysis_list_factor_mean_cols, function(df) {
+  ggplot(df, aes(treatment, AC01_SCORE, color=treatment)) + geom_boxplot() + stat_boxplot(geom='errorbar',coef=5) + geom_jitter(width = 0.2) + ylim(1, 5)
+})
+
+ac01_plot
+```
+
+```{r}
+di01_plot <- lapply(analysis_list_factor_mean_cols, function(df) {
+  ggplot(df, aes(treatment, DI01_SCORE, color=treatment)) + geom_boxplot() + stat_boxplot(geom='errorbar',coef=5) + geom_jitter(width = 0.2) + ylim(1, 5)
+})
+
+di01_plot
+```
+
+```{r}
+ui01_plot <- lapply(analysis_list_factor_mean_cols, function(df) {
+  ggplot(df, aes(treatment, UI01_SCORE, color=treatment)) + geom_boxplot() + stat_boxplot(geom='errorbar',coef=5) + geom_jitter(width = 0.2) + ylim(1, 5)
+})
+
+ui01_plot
+```
+
+```{r}
+ex01_plot <- lapply(analysis_list_factor_mean_cols, function(df) {
+  ggplot(df, aes(treatment, EX01_SCORE, color=treatment)) + geom_boxplot() + stat_boxplot(geom='errorbar',coef=5) + geom_jitter(width = 0.2) + ylim(1, 5)
+})
+
+ex01_plot
+```
+
+```{r fig.width=10, fig.height=6}
+analysis_summary_df <- bind_rows(analysis_list_factor_mean_cols)
+
+sum_ac01_plot <- ggplot(analysis_summary_df, aes(treatment, AC01_SCORE, color=treatment)) + geom_boxplot() + stat_boxplot(geom='errorbar',coef=5) +  geom_jitter(width = 0.2) + ylim(1, 5)
+
+sum_di01_plot <- ggplot(analysis_summary_df, aes(treatment, DI01_SCORE, color=treatment)) + geom_boxplot() + stat_boxplot(geom='errorbar',coef=5) + geom_jitter(width = 0.2) + ylim(1, 5)
+
+sum_ui01_plot <- ggplot(analysis_summary_df, aes(treatment, UI01_SCORE, color=treatment)) + geom_boxplot() + stat_boxplot(geom='errorbar',coef=5) + geom_jitter(width = 0.2) + ylim(1, 5)
+
+sum_ex01_plot <- ggplot(analysis_summary_df, aes(treatment, EX01_SCORE, color=treatment)) + geom_boxplot() + stat_boxplot(geom='errorbar',coef=5) + geom_jitter(width = 0.2) + ylim(1, 5)
+
+
+ggarrange(sum_ac01_plot, sum_di01_plot, sum_ui01_plot, sum_ex01_plot, ncol=2, nrow=2, common.legend = TRUE, legend = "right")
+```
+
+As the questionnaire only allows to answer on a Likert scale 1-5 ordinal response format with 1 indicating the highest disagreement and 5 in reverse, the medians and values interpreted below are rounded, i.e., 2.5 ≈ 3.
+
+For the dependent variable of accountability (AC01_SCORE), a common median of 4 is observed. This indicates that all treatments are likely to achieve a high accountability from a user point of view, i.e., all treatments interact with the user in a rather neutral, believing, and rule-accompanying way. However, for CoT and CoTxRAG the minimum value significantly disagrees referring to a tiny share of users do not agree to the median at all. For all four treatments, the values are concentrated around 4 (3 - 5) - which overall agress with the median.
+
+The second dependent variable, disclosure (DI01_SCORE), varies broadly compared to the prior outlined variable as the median of RAG and CoTxRAG is 4 whereas Vanilla's and CoT's median is 1. Accordingly, RAG-based treatments are more likely to be perceived as disclosing sources and additional content than Vanilla or CoT treatments. However, a maximum value of 5 for the latter both indicate that it is not unlikely at all that those two treatments are perceived disclosing, too. In contrast, RAG's and CoTxRAG's minimum values are 2 and 3 indicating that users are very likely to perceive those treatments at least a bit disclosing. To conclude, the values for Vanilla and CoT are less dispersed than the values for RAG and CoTxRAG referring a higher agreement among respondents of the latter two treatments.
+
+Usefulness of information (UI01_SCORE) as the third dependent variable, achieves a higher agreement across all four treatments with a median of 5 and a similar dispersion of values of 3 - 5. Consequently, all users are likely to agree that all treatment's lead to useful information that contains the most important points of a user's request in an understandable way.
+
+Finally, the tendency of the last dependent variable of explainability (EX01_SCORE) is conducted. Here again more varying medians are observed as all treatments have a median of 2 except for CoTxRAG which inherits a median of 3. Similar to disclosure that values are spread across all possible values 1 - 5. Although the maximum value of CoT which is 4 indicates that CoT is more likely to be perceived less explainable than the others, i.e., allowing to trace its argumentation and to react on the user's demands. In contrast to the others, CoTx RAG is more spread around 3 which explains its higher median. Consequently, it is more likely to be perceived more explainable than the other treatments. It has to be nouned that a value of 3 indicates neither a high nor a low explainability. Thereby, even though CoTxRAG is more likely to have a higher explainablility than the other treatments, it is likely to be only moderately explainable in the end.
+
+
+
+<h2>Calculation and Interpretation of Descriptive Statistic Metrics</h2>
+Based on the previous outcomes, we analyze the descriptive statistic metrics. Hereby, a significance level alpha of 0.05 is assumed. We start with depicting a table that contains descriptive information of each factor: 
 <ul>
 <li>General information: sample size (N),</li>
 <li>Central tendency information and central dispersion:
 <ul>
 <li>mean,</li>
 <li>lower and upper confidence interval (CI) of the mean,</li>
-<li>median,</li>
 <li>standard error (SE),</li>
+<li>median,</li>
+<li>mode,</li>
 </ul>
 </li>
 <li>Further dispersion information:
 <ul>
 <li>standard deviation (SD),</li>
 <li>variance,</li>
-<li>median,</li>
 <li>the minimum and maximum value.</li>
 </ul>
 </li>
 </ul>
 
-The metrics are determined in two steps in order to take the properties of the imputed data into account. Whereas the N of each treatment can be determined by simply counting the rows of a treatment, the mean and SD are ascertained by using a method of the "miceadds" package that allows to directly calculate these metrics on the foundation of imputed data (Robitzsch et al., 2025). Mean and SD establish the ground for further metric calculations, i.e., the second step. 
+The metrics are determined in two steps in order to take the properties of the imputed data into account. Whereas the N of each treatment can be determined by simply counting the rows of a treatment, the mean and SD are ascertained by using a method of the "miceadds" package that allows to directly calculate these metrics on the foundation of imputed data (Robitzsch et al., 2025). Mean and SD establish the ground for further metric calculations, i.e., the second step. However, Robitzsch et al. (2025) do not mention in which way the SE, confidence intervals and p values of the multiple imputation is considered. As the method suggested by Robitzsch et al. (2025) is primarly used for weighted datasets, we assume that the impact of multiple imputation on the prior mentioned metrics is not considered fully.
 
 The variance is calculated on the basis of the SD as the SD is the quadratic square root of the variance. Moreover, the SE is calculated by dividing the SD by the square root of a treatment's N. The lower and upper confidence intervals can be ascertained by subtracting/adding the multiplication of the z-scores of "the 2.5% and 97.5% quantiles of a standard normal distribution [+- 1.96]" (Kaltenbach, 2021, p. 25) with the SE. (Kaltenbach, 2021)
 
@@ -118,17 +220,18 @@ The minimum and maximum values of each treatment are also provided to show the m
 
 For the calculation of median, mode and min/max values, Rubin's rules of pooling are not considered as no predefined function that takes imputed data properties into account is used (Van Buuren, 2011), e.g., as functions of the "miceadds" package (Robitzsch et al., 2025). But as those metrics are only used for interpreting the descriptive statistics and not ongoingly, this limitation is acknowledged and accepted. The metrics are calculated for a combined dataset consisting of all rows of each imputed dataset for each treatment, i.e., if a treatment occurs 36 times, it has 36 rows per imputed dataset - as 10 imputed datasets are constructed, 360 rows are considered for median, mode, min/max calculation.
 
-```{r}
-treatments = c(1:4)
-relevant_vars = c("AC01_SCORE", "UI01_SCORE", "DI01_SCORE", "EX01_SCORE")
+As a foundation the list "list_factor_mean_cols" of imputed dataset is used as an encoded treatment, i.e., 1:4 instead of "Vanilla":"CoTxRAG", decreases the potential for errors due to type differences, e.g., character to double.
 
-initial_descriptive_stats <- map_dfr(1:4, function(treatment) {
+```{r}
+relevant_vars = c("AC01_SCORE", "DI01_SCORE", "UI01_SCORE", "EX01_SCORE")
+
+initial_descriptive_stats <- map_dfr(1:4, function(current_treatment) {
   
   treatment_subset <- lapply(
     list_factor_mean_cols, 
     function(df) df %>%
-      dplyr::filter(TR01 == treatment) %>%
-        dplyr::select(TR01, AC01_SCORE, UI01_SCORE, DI01_SCORE, EX01_SCORE)
+      dplyr::filter(treatment == current_treatment) %>%
+        dplyr::select(treatment, AC01_SCORE, DI01_SCORE, UI01_SCORE, EX01_SCORE)
   )
   
   glimpse(treatment_subset)
@@ -138,16 +241,16 @@ initial_descriptive_stats <- map_dfr(1:4, function(treatment) {
   
   # Checking the N
   N_of_each_treatment_per_imp <- sapply(treatment_subset, nrow)
-  N_mean <- mean(N_of_each_treatment_per_imp)
+  N <- mean(N_of_each_treatment_per_imp)
 
   # Determining the metrics
-  treatment_mean <- ma.wtd.meanNA(
-    mids_treatment_subset, vars = relevant_vars)
-  treatment_sd <- ma.wtd.sdNA(mids_treatment_subset, vars = relevant_vars)
-  treatment_var <- treatment_sd * treatment_sd
-  treatment_se <- treatment_sd / sqrt(N_mean)
-  treatment_lower_CI <- treatment_mean - 1.96 * treatment_se
-  treatment_higher_CI <- treatment_mean + 1.96 * treatment_se
+  mean <- round(ma.wtd.meanNA(
+    mids_treatment_subset, vars = relevant_vars), 2)
+  SD <- round(ma.wtd.sdNA(mids_treatment_subset, vars = relevant_vars), 2)
+  variance <- round((SD * SD), 2)
+  SE <- round((SD / sqrt(N)), 2)
+  lower_CI <- round((mean - 1.96 * SE), 2)
+  upper_CI <- round((mean + 1.96 * SE), 2)
   
   
   # Combine all rows of each of the 10 imputed datasets into one dataset for each treatment to calculate median, mode, max, min value
@@ -162,7 +265,7 @@ initial_descriptive_stats <- map_dfr(1:4, function(treatment) {
       )
     )
     transponed_median <- as.data.frame(t(treatment_median))
-    colnames(transponed_median) <- c("treatment_median")
+    colnames(transponed_median) <- c("median")
   
   # Calculate mode value
   treatment_mode <- treatment_subset_combined %>% 
@@ -172,7 +275,7 @@ initial_descriptive_stats <- map_dfr(1:4, function(treatment) {
       )
     )
     transponed_mode <- as.data.frame(t(treatment_mode))
-    colnames(transponed_mode) <- c("treatment_mode")
+    colnames(transponed_mode) <- c("mode")
   
   
   # Calculate min value
@@ -183,7 +286,7 @@ initial_descriptive_stats <- map_dfr(1:4, function(treatment) {
       )
     )
     transponed_min <- as.data.frame(t(treatment_min))
-    colnames(transponed_min) <- c("treatment_min")
+    colnames(transponed_min) <- c("minimum")
   
   # Calculate max value
   treatment_max <- treatment_subset_combined %>% 
@@ -193,22 +296,21 @@ initial_descriptive_stats <- map_dfr(1:4, function(treatment) {
       )
     )
     transponed_max <- as.data.frame(t(treatment_max))
-    colnames(transponed_max) <- c("treatment_max")
+    colnames(transponed_max) <- c("maximum")
   
   # Transforming metrics into the output format of a df
-  output_mean <- as.data.frame(treatment_mean)
-  glimpse(output_mean)
-  output_sd <- as.data.frame(treatment_sd)
-  output_var <- as.data.frame(treatment_var)
-  output_n <- as.data.frame(N_mean)
-  output_treatment_se <- as.data.frame(treatment_se)
-  output_treatment_lower_CI <- as.data.frame(treatment_lower_CI)
-  output_treatment_higher_CI <- as.data.frame(treatment_higher_CI)
+  output_mean <- as.data.frame(mean)
+  output_sd <- as.data.frame(SD)
+  output_var <- as.data.frame(variance)
+  output_n <- as.data.frame(N)
+  output_treatment_se <- as.data.frame(SE)
+  output_treatment_lower_CI <- as.data.frame(lower_CI)
+  output_treatment_upper_CI <- as.data.frame(upper_CI)
+  dependent_variable <- relevant_vars
 
   # Combining the output
-  output <- cbind(output_mean, output_sd, output_var, output_n, output_treatment_se, output_treatment_lower_CI, output_treatment_higher_CI, transponed_median, transponed_mode, transponed_min, transponed_max)
-  output$TR01 <- treatment
-  
+  output <- cbind(dependent_variable, output_mean, output_sd, output_var, output_n, output_treatment_se, output_treatment_lower_CI, output_treatment_upper_CI, transponed_median, transponed_mode, transponed_min, transponed_max)
+  output$treatment <- current_treatment
   output
   
 })
@@ -217,45 +319,368 @@ initial_descriptive_stats
 
 ```
 
-The above calculated table has to be cleaned up for interpretation and for depicting the boxplots by treatment and factor.
+The above calculated table has to be cleaned up for interpretation. This includes dropping the "...11" column which depicts only one alternative value for mode in row 8. To enhance an user's understanding, the treatment column is recoded into its descriptions, i.e., 1 = Vanilla, 2 = CoT, 3 = RAG, 4 = CoTxRAG. Besides, the column sequence is restructured for improved clarity in line with the previously outlined sequence.
 
 ```{r}
 descriptive_stats <- as.data.frame(initial_descriptive_stats)
-descriptive_stats <- dplyr::select(descriptive_stats, -13)
 
-view(descriptive_stats)
+# Drop "...11" column
+descriptive_stats <- dplyr::select(descriptive_stats, -14)
+
+# Relocate columns
+descriptive_stats <- descriptive_stats[, c(1, 13, 5, 2, 7, 8, 6, 9, 10, 3, 4, 11, 12)]
+
+# Recode treatment from numbers into description
+descriptive_stats <- descriptive_stats %>%
+  mutate(
+    treatment = case_match(
+      treatment, 
+      1 ~ "Vanilla",
+      2 ~ "CoT",
+      3 ~ "RAG",
+      4 ~ "CoTxRAG",
+      .default = as.character(treatment)
+      )
+    )
+
+descriptive_stats
+```
+
+In preparation for interpretation, also a grouping against the dependent variables AC01, DI01, UI01, EX01 by treatment is established.
+
+```{r}
+descriptive_stats <- descriptive_stats %>% 
+  mutate(
+    dependent_variable = factor(
+      dependent_variable,
+      levels = c("AC01_SCORE", "DI01_SCORE", "UI01_SCORE", "EX01_SCORE")
+    ),
+    treatment = factor(
+      treatment,
+      levels = c("Vanilla", "CoT", "RAG", "CoTxRAG")
+    )
+  ) %>%
+  arrange(dependent_variable, treatment)
+
+descriptive_stats
+```
+
+Similar as with the interpretation of the boxplots, the metric values are rounded due to their Likert scale ordinal response format ranging from 1 - 5. As we assume that the impact of multiple imputation is not sufficiently considered within the calculation method, we need to assume that both confidence intervals and SEs are broad and higher than depicted. Besides, the SD and not the variance as its square sum is interpreted.
+
+At a first glance, the unbalancedness of the treatments' N has to be noted which has already been introduced previously. This impacts the latter MANOVA and ANOVAs and cannot be disregarded.
+
+As with the boxplots' interpretation, we are starting with the dependent variable of accountability (AC01_SCORE). Each treatment shares the same rounded mean of 4 indicating an overall sample tendency towards being likely to perceive a high accountability for each of the treatments. This is underpinned by the lower and upper confidence intervals which are rather narrow. Although, the lower confidence interval ≈ 3.48 of CoTxRAG can lead in at least one out of 95 % cases to a mean of 3. The SEs are close to 0.1 and thus, rather low indicating a precise estimate. As outlined before, the median is around 4. For the mode, Vanilla achieves the highest value with 5, whereas the other treatments remain at 4. This indicates that 5 is the most often chosen rating for Vanilla and thus, that the ratings are spread at least from 3 to 5 as 4 is the mean. The latter is underlined by the previous boxplot observations stating that the values are concentrated around 4. As the SD is below 1, we assume a moderate dispersion of values relative to the mean of 4 - leading rounded to a value of 3 or 5. All treatments share the same maximum value of 5, but only CoT and CoTxRAG have a common minimum value of 1 indicating a different perceived accountability within each treatment group. For Vanilla, this attenuated by a minimum value of 2. Whereas for RAG, the minimum value of 3 indicates a moderate agreement among the respondents of the treatment group.
+
+Continuing with disclosure (DI01_SCORE) where the mean varies significantly from Vanilla and CoT sharing a mean of 2 compared to RAG and CoTxRAG which share a mean of 4. This refers to that users are more likely to associate RAG and/or CoTxRAG as disclosing than Vanilla and CoT. For Vanilla, the lower confidence interval even suggests that a mean of 1 indicating that Vanilla might be perceived as non-disclosing at all is possible. In contrast, the other lower and upper confidence intervals underpin the respective means. The SEs are close to 0.1 and thus, rather low indicating a precise estimate. In line with previous boxplot findings a median of 1 for Vanilla and CoT and a median of 4 for RAG and CoTxRAG is suggested. This is supported by the mode sharing the same values (1 and 4). Higher SDs compared to the SDs of accountability indicate a higher dispersion around the mean, i.e., that values of Vanilla, CoT and RAG differ by +- 1 compared to their mean. Whereas values of CoTxRAG a rather + 1 higher than their mean. All treatments share the same maximum value of 5 indicating a high dispersion for Vanilla and CoT which also share a minimum value of 1. For RAG, the dispersion is a bit lower with a minimum value of 2. In contrast, the respondents of CoTxRAG tend to agree more with a minimum value of 3.
+
+For usefulness (UI01_SCORE), the mean across treatments is rounded to 4 which points out that all treatments being likely perceived as useful. Whereas with the lower confidence interval the mean remains at 4, the upper confidence interval indicates that there is a chance that at least for one out of 95 % cases a mean of 5 can be expected for all treatments. The SE is lower than for the other dependent variables referring that the precision of the estimate is the highest, relatively. A median of 5 for all treatments agrees with the mean, whereas the mode agrees in all except of one treatments - RAG where a mode of 4 is achieved. Consequently, the must a high amount of 4 and 5 ratings for RAG to achieve previous metric values for usefulness. For all treatments the dispersion around the mean is rather low as the values remain rounded at 4. This rather low dispersion around the mean can be transferred to the total dispersion being low, too, as the minimum values are 3 and the maximum values are 5.
+
+In terms of explainability (EX01_SCORE), all means are rounded to 2 except for CoTxRAG which is rounded to 3. For Vanilla and CoT the mean remains at 2 according to their lower and upper confidence intervals. In contrast, the mean of RAG could increase to 3 in line with the upper confidence interval of ≈ 2.91 which is rounded to 3. In reverse for the mean of CoTxRAG which could decrease to 2 according to its lower confidence interval of 2.48 rounded to 2. Compared to the other dependent variables, the SEs are the highest and thus, the estimates are the most imprecise one despite a still high precision (≈ 0.17, ≈ 0.13, ≈ 0.22, ≈ 0.17). The median agrees with the means, i.e., 2 except for CoTxRAG which is 3. Whereas the mode varies as the most frequent value for Vanilla, CoT and RAG is 1 indicating that those three are very likely to be perceived with a low explainability. In contrast, the mode of CoTxRAG is 3, i.e., a moderate explainability is likely to be perceived by the respondents. The SD is moderately high stating a dispersion around the mean of up to a rating difference of 2, e.g., for RAG with a SD ≈ 1.20 indicating a maximum dispersion of values to the rating of 4. A moderately high SD indicates a within group disagreement and thus, a broad dispersion. This is underpinned by minimum and maximum values ranging from at least 1 to 4.
+
+To summarize, the dependent variables of accountability (AC01_SCORE) and usefulness (UI01_SCORE) share similar metric values and dispersion for all treatments. This indicates that all treatments are likely to be perceived the same in terms of accountability and usefulness. Although, for the dependent variables of disclosure (DI01_SCORE) and explainability (EX01_SCORE) the metrics vary. At a first glance, this indicates that at least CoTxRAG achieves a higher rating than the other treatments and thus, is more likely to be perceived more disclosing and explainable. To further elaborate on this effect, a MANOVA is conducted in the following.
+
+<h1>Factorial MANOVA</h1>
+With factorial MANOVA the following null hypothesis are checked (Friedrich, Konietschke and Pauly, 2019):
+<ul>
+<li>
+H01: For the main effects: the mean vector of the dependent variables is equal across all groups of independent variables, i.e. the treatment does not have a significant effect on any dimension of transparency. This can be detailed into two hypothesis:
+<ul>
+<li>H01a: The post-training treatment of RAG does not have a multivariate effect on any dimension of transparency.</li>
+<li>H01b: The inference treatment of CoT does not have a multivariate effect on any dimension of transparency.</li>
+</ul>
+</li>
+<li>H02: For the interaction effects: the combination of independent variable groups does not lead to additional effects compared to their singular application, i.e. the combination of treatments (CoT and RAG) has an equal effect on any dimension of transparency as if the treatments were applied alone.</li>
+</ul>
+For each null hypotheses and further statistical test, a significance level alpha of 0.05 is assumed.
+
+To allow for a factorial MANOVA calculation with non-binary factor levels as "Vanilla", "CoT", "RAG", and "CoTxRAG", an encoding into binary variables is necessary (Navarro and Foxcroft, 2025). As a consequence, we define the following encoding to represent the factorial research design:
+<table><thead>
+  <tr>
+    <th colspan="2" rowspan="2"></th>
+    <th colspan="2">Post-Training</th>
+  </tr>
+  <tr>
+    <th>Vanilla</th>
+    <th>RAG</th>
+  </tr></thead>
+<tbody>
+  <tr>
+    <th rowspan="2">Inference</th>
+    <th>Vanilla</th>
+    <td>00</td>
+    <td>01</td>
+  </tr>
+  <tr>
+    <th>CoT</th>
+    <td>10</td>
+    <td>11</td>
+  </tr>
+</tbody>
+</table>
+As only one inference and post-training method is tested as a treatment, the factors are named as the methods not as the actual factors, i.e., CoT and RAG.
+
+To establish this coding, the mids object is transformed into long list consisting of stacked rows, i.e., instead of 10 separate datasets, one dataset expanded by a column inheriting the imputation number is created (Van Buuren and Groothuis-Oudshoorn, 2011). After coding, the stacked dataset is transformed back into a mids object for further analysis.
+
+```{r}
+analysis_list_factor_mean_cols_coded <- lapply(analysis_list_factor_mean_cols, function(df) {
+    df %>%
+        mutate(
+        CoT = factor(ifelse(treatment %in% c("CoT", "CoTxRAG"), 1, 0),
+                 levels = c(0, 1)),
+        RAG = factor(ifelse(treatment %in% c("RAG", "CoTxRAG"), 1, 0),
+                 levels = c(0, 1))
+        )})
+
+analysis_list_factor_mean_cols_coded
+
+# Transformed back into a mids
+mids_coded <- datalist2mids(analysis_list_factor_mean_cols_coded)
+```
+
+<h2>Checking Assumptions on (Multivariate) Normality and Homoscedasticity</h2> 
+Before starting the factorial MANOVA, its underlying assumptions of normality and homoscedasticity are required to be checked on the basis of the prior encoded independent variables (Ståhle and Wold, 1990). The assumptions of independent objects, an invertible covariance matrix, and multicollinearity are given for both, MANOVA and post-hoc ANOVAs, and thus, are not further evaluated which stated in detail within the thesis (Ståhle and Wold, 1990; Kang and Jin, 2016; Brown, 2015).
+
+The basis for the evaluation of multi- and univariate normality is laid by the null hypothesis of a normally distributed data sample (Shapiro and Wilk, 1965). Hence, the aim is to fail to reject the null hypothesis:
+H0: The dataset "is a sample from a normal distribution" (Shapiro and Wilk, 1965, p. 592).
+
+As MANOVA as a multivariate approach is conducted first (Kang and Jin, 2016), the multivariate normality assumption is tested first, too. Therefore, the multivariate skewness and kurtosis test statistics procedure of Mardia (1970) is applied. Skewness and kurtosis provide information on the degree of deviation from multivariate normality (Kang and Jin, 2016). If both statistics result in p-values rejecting the null hypothesis, a multivariate non-normality is assumed (Zhou and Shao, 2014; Zhang, Zhou and Shao, 2025).
+
+The Mardia test is conducted for the dependent variables within all of the 10 imputed datasets as a stacked dataset containing all 10 datasets in one would blurry results. As a consequence, 10 test statistic results are expected. The decision is made to not test multivariate normality per treatment group due to an increased complexity of interpreting 40 instead of 10 test statistics.
+
+```{r}
+#mardia_test_treatment <- lapply(analysis_list_factor_mean_cols_coded, #function(df) {
+#  df %>%
+#  group_split(treatment) %>%
+#    lapply(function(.group) 
+#      mardia(.group[, c("AC01_SCORE", "DI01_SCORE", "UI01_SCORE", "EX01_SCORE")])$mv.test
+#      )
+#})
+
+mardia_test <- lapply(analysis_list_factor_mean_cols_coded, function(df) {
+      mardia(df[, c("AC01_SCORE", "DI01_SCORE", "UI01_SCORE", "EX01_SCORE")])$mv.test
+})
+
+mardia_test
+#mardia_test_treatment
+```
+
+Across all 10 test statistics multivariate non-normality is present as the third row's ("MV Normality") indicates within the fourth column ("Result") with a "NO" value. This is because the tests for skewness and kurtosis reject the null hypothesis through p-values < 0.05. Except for the fifth test statistic of the fifth imputed dataset in which the test statistic of kurtosis ≈ 1.94, p-value ≈ 0.0524, result = YES. Although, the skewness leads to the overarching failure of accepting the null hypothesis for the fifth imputed dataset as the skewness statistic ≈ 82.93, p-value ≈ 0, result = NO and thus, rejects the null hypothesis. As all imputed datasets fail H0, we state that a non-normal multivariate distribution is prevalent for the at hand data sample consisting of 10 imputed datasets. 
+
+To further validate the normality assumption, the univariate normality of the dependent variables is evaluated using the Shapiro Wilk test (Shapiro and Wilk, 1965). W values close to 1 indicate the likelihood of normality and W values close to 0 the contrary (Shapiro and Wilk, 1965). The Shapiro Wilk test for normality is conducted for each imputed dataset as a stacked dataset containing all 10 datasets in one would blurry results. Moreover, univariate normality is tested per treatment group as ANOVA assumes normality for all dependent variables across all independent variables. In addition, the results for each dataset are calculated as mean for interpretation purposes.
+
+```{r}
+shapiro_wilk_test_list <- lapply(analysis_list_factor_mean_cols_coded, function(df) {
+  df %>%
+    group_by(treatment) %>%
+      shapiro_test(AC01_SCORE, DI01_SCORE, UI01_SCORE, EX01_SCORE)
+})
+
+shapiro_stacked <- bind_rows(shapiro_wilk_test_list)
+
+shapiro_wilk_test_avg <- shapiro_stacked %>%
+  group_by(treatment, variable) %>%
+    summarise(
+      mean_statistic = mean(statistic),
+      mean_p = mean(p),
+      .groups = "drop"
+    )
+
+shapiro_wilk_test_list
+shapiro_wilk_test_avg
+```
+
+Despite predominantly close to 1 mean W-values, except for Vanilla - DI01_SCORE W ≈ 0.66, we must reject H0 for all dependent variables as the mean p-values are < 0.05. Only one treatment - variable combination fails to reject H0 (CoTxRAG - EX01_SCORE W ≈ 0.97) with a p-value ≈ 0.59. Examining the total list of results, it becomes apparent that CoTxRAG - EX01_SCORE W ≈ 0.97 consistently fails to reject H0 with a p-value < 0.05. Nevertheless, as the majority fails H0, we state that a non-normal univariate distribution is prevalent for the at hand data sample consisting of 10 imputed datasets. 
+
+Even though multi- and univariate non-normality is present, (M)ANOVA can be conducted due to their robustness to non-normality especially if the sample is large (Kang and Jin, 2016). As the dataset of the at hand thesis contains 131 samples with at least 20 participants per group which is in line with the rule of thumb of Bhattacherjee (2012), the sample is considered large and thus, robust against non-normality. Although, it has to be noted that the apparent non-normality might influence the power of the latter (M)ANOVA test statistics, e.g., Wilk's lambda (Ståhle and Wold, 1990). 
+
+Another assumption relies within homoscedasticity/homogeneity of (co-)varianc ewhich is explained as a “constant error variance" (Von Eye and Wiedermann, 2023, p. 130). For MANOVA, the Box M test is suggested to validate the “multivariate homogeneity of variance-covariance matrix” (Kang and Jin, 2016, p. 4), i.e., that the variance-covariance matrix equals across treatments (Kang and Jin, 2016). Thus, the null hypothesis we aim to fail to reject is: 
+H0: All the dependent variables have equal variance-covariance matrices.
+
+The Box-M test is conducted for each imputed dataset:
+
+```{r}
+box_m_test <- lapply(analysis_list_factor_mean_cols_coded, function(df) {
+  result <- boxM(df[, c("AC01_SCORE", "DI01_SCORE", "UI01_SCORE", "EX01_SCORE")], group = df$treatment)
+})
+
+box_m_test
+```
+
+The Box-M tests of all 10 imputed datasets report a chi-square statistic of closest to accepting for the eighth imputed dataset with a chi-square ≈ 59.483 on 30 df and a p-value ≈ 0.001063. Nevertheless, this p-value still leads to rejecting the H0. Although, if the significance level is set to 0.001, H0 would not be rejected for this dataset. However, as all the other test statistics display even more non-significant values, the at hand Box-M test indicates a heterogeneity of the variance-covariance matrixes and thus, a cautious interpretation of MANOVA test statistics is necessary (Denis, 2020).
+
+As with the normality assumption evaluation, the univariate assumption of homogeneity of variances is evaluated in preparation for the post-hoc ANOVAs using Levene’s test. This test aims to validate the null hypothesis of:
+H0: All independent groups of an dependent variable have equal variances (Kaltenbach, 2021).
+
+```{r}
+levene_test <- lapply(analysis_list_factor_mean_cols_coded, function(df){
+  map_df(c("AC01_SCORE", "DI01_SCORE", "UI01_SCORE", "EX01_SCORE"), function(dep_var){
+    result <- leveneTest(as.formula(paste(dep_var, "~ treatment")), data = df)
+  })
+})
+
+levene_test
+```
+
+In contrast to the multivariate test statistics, the univariate H0 is likely to be accepted. As even the test statistic result whose p-value is closest to 0, points on accepting H0. This test statistic for the tenth imputed dataset's group 7 which is the group CoTxRAG with 3 df (as all other test statistics) and an F-value ≈ 1.8371 followed by a p-value ≈ 0.1437. Hence, the conclusion is made that H0 is likely to be accepted that all variances are homogeneous for a significance value of 0.05. This is further reinforced by the prior descriptive statistics which already indicated only a minor difference in variance among the independent groups.
+
+<h2>Two-way MANOVA</h2>
+On the basis of the prior analysis, we can assume a non-normality and heterogeneity for the at hand unbalanced data sample consisting of 10 imputed datasets. Against this background, a test statistic for the following two-way MANOVA must be selected out of four potential test statistics: Roy’s largest root, Hotelling’s trace, Wilk’s lambda, Pillai’s trace (Kang and Jin, 2016).
+
+Pillai’s trace is chosen as a test statistic for the at hand two-way MANOVA. It reveals to be the appropriate fit in line with the literature findings within the thesis and the statistical results so far which indicate a non-normality and heterogeneity against the backdrop of an unbalanced sample.
+
+The two-way MANOVA is conducted on the basis of a mids object which captures the uncertainty of the imputation process sufficiently within the MANOVA analysis (Van Buuren and Groothuis-Oudshoorn, 2011). The model is constructed on the basis of the two factors: inference and post-training which are transformed in line with their two-levels each - including Vanilla - into CoT and RAG. Thus, the model to be evaluated is:
+
+AC01_SCORE, DI01_SCORE, UI01_SCORE, EX01_SCORE = grand mean (=Intercept which includes Vanilla) + CoT + RAG + CoT*RAG + residual error.
+
+This model is constructed according to Zhang (2011) who also conducted a two-way MANOVA. The following code shows a glimpse using a pooled mipo object with type II treatment sum of squares calculation which is dependent on the order of factors (Kaltenbach, 2021). RAG0 or CoT0 show the ... (Vanilla not significant). ... Only second rows show a glimpse for significance for main effects for the model - whereas RAG is significant and CoT not indicating first signs that only one main effect hypothesis can be rejected. No interaction effect in both cases. <SCHÖN SCHREIBEN MIT ZAHLEN!!!!!!!>
+
+```{r}
+f1 <- with(mids_coded, lm(cbind(AC01_SCORE, DI01_SCORE, UI01_SCORE, EX01_SCORE) ~ RAG + CoT + CoT * RAG - 1))
+
+f2 <- with(mids_coded, lm(cbind(AC01_SCORE, DI01_SCORE, UI01_SCORE, EX01_SCORE) ~ CoT + RAG + CoT * RAG - 1))
+
+#pool(f1)
+#pool(f2)
+
+as.data.frame(summary(pool(f1)))
+as.data.frame(summary(pool(f2)))
+```
+
+The following sequence of work aligns with ...
+
+First two-way MANOVA, if a significant interaction effect is observed then one-way MANOVA for all independent vars, i.e., RAG and CoT:RAG. If no significant interaction; factorial ANOVA for each dependent var. If no significant interaction here, too -> 
+
+....
+
+
+```{r}
+manova_fit <- with(mids_coded, manova(cbind(AC01_SCORE, DI01_SCORE, UI01_SCORE, EX01_SCORE) ~ CoT * RAG))
+
+manova_model <- summary(manova_fit, test = c("Pillai"))
+manova_model
+```
+
+Pooling - ....
+
+```{r}
+# Extract all F-statistics for each level and combination, i.e., 10 F-statistic values for each treatment
+manova_stats_CoT <- map_dbl(manova_fit$analyses, ~{tidy(.x)$statistic[1]})
+manova_stats_RAG <- map_dbl(manova_fit$analyses, ~{tidy(.x)$statistic[2]})
+manova_stats_CoTxRAG <- map_dbl(manova_fit$analyses, ~{tidy(.x)$statistic[3]})
+
+# Pool the F-statistic based on Rubin's rules
+pooled_F_stats_CoT <- micombine.F(manova_stats_CoT, df = 10)
+pooled_F_stats_RAG <- micombine.F(manova_stats_RAG, df = 10)
+pooled_F_stats_CoTxRAG <- micombine.F(manova_stats_CoTxRAG, df = 10)
+```
+
+For visualization and interpretation purposes, these pooled values are depicted within a MANOVA table as follows.
+
+```{r}
+# Combine pooled results within a table
+pooled_manova_CoT <- data.frame(term = c("CoT"))
+pooled_manova_RAG <- data.frame(term = c("RAG"))
+pooled_manova_CoTxRAG <- data.frame(term = c("CoT:RAG"))
+
+# Transpone pooled stats
+pooled_F_stats_CoT_df <- t(as.data.frame(pooled_F_stats_CoT))
+pooled_F_stats_RAG_df <- t(as.data.frame(pooled_F_stats_RAG))
+pooled_F_stats_CoTxRAG_df <- t(as.data.frame(pooled_F_stats_CoTxRAG))
+
+# Combine transponed, pooled stats with preprint
+pooled_manova <- bind_rows(bind_cols(pooled_manova_CoT, pooled_F_stats_CoT_df), bind_cols(pooled_manova_RAG, pooled_F_stats_RAG_df), bind_cols(pooled_manova_CoTxRAG, pooled_F_stats_CoTxRAG_df))
+
+pooled_manova <- pooled_manova %>%
+  rename(
+    statistic = D
+  )
+
+pooled_manova
+```
+
+Interpretation:
+two significant main effects - no interaction effect
+
+
+
+<h2>Factorial ANOVA</h2>
+Between groups check ...
+
+```{r}
+# Listed ANOVAS across all imputed datasets
+anova_fit_list_ac <- with(mids_coded, anova(lm(AC01_SCORE ~ CoT * RAG)))
+anova_fit_list_di <- with(mids_coded, anova(lm(DI01_SCORE ~ CoT * RAG)))
+anova_fit_list_ui <- with(mids_coded, anova(lm(UI01_SCORE ~ CoT * RAG)))
+anova_fit_list_ex <- with(mids_coded, anova(lm(EX01_SCORE ~ CoT * RAG)))
+
+summary(anova_fit_list_ac)
+summary(anova_fit_list_di)
+summary(anova_fit_list_ui)
+summary(anova_fit_list_ex)
+
+# Pooled ANOVAS
+pooled_anova_fit_ac <- mi.anova(mi.res = mids_coded, formula = "AC01_SCORE ~ CoT * RAG", type = 3)
+pooled_anova_fit_di <- mi.anova(mi.res = mids_coded, formula = "DI01_SCORE ~ CoT * RAG", type = 3)
+pooled_anova_fit_ui <- mi.anova(mi.res = mids_coded, formula = "UI01_SCORE ~ CoT * RAG", type = 3)
+pooled_anova_fit_ex <- mi.anova(mi.res = mids_coded, formula = "EX01_SCORE ~ CoT * RAG", type = 3)
+
+# R-squared values for each pooled ANOVA table
+print(pooled_anova_fit_ac$r.squared)
+print(pooled_anova_fit_di$r.squared)
+print(pooled_anova_fit_ui$r.squared)
+print(pooled_anova_fit_ex$r.squared)
+```
+
+The factorial ANOVAs' results are stored within the following tables which serve as a foundation for the interpretation, respectively.
+
+```{r}
+# Summary tables
+anova_ac <- data_frame(
+  AC01 = c("CoT", "RAG", "CoT:RAG", "Residual")
+)
+anova_ac <- bind_cols(anova_ac, pooled_anova_fit_ac)
+anova_ac <- anova_ac[, c(1, 3, 4, 5, 6, 7, 2, 8, 9, 10)]
+
+anova_di <- data_frame(
+  DI01 = c("CoT", "RAG", "CoT:RAG", "Residual")
+)
+anova_di <- bind_cols(anova_di, pooled_anova_fit_ac)
+anova_di <- anova_di[, c(1, 3, 4, 5, 6, 7, 2, 8, 9, 10)]
+
+anova_ui <- data_frame(
+  UI01 = c("CoT", "RAG", "CoT:RAG", "Residual")
+)
+anova_ui <- bind_cols(anova_ui, pooled_anova_fit_ac)
+anova_ui <- anova_ui[, c(1, 3, 4, 5, 6, 7, 2, 8, 9, 10)]
+
+anova_ex <- data_frame(
+  EX01 = c("CoT", "RAG", "CoT:RAG", "Residual")
+)
+anova_ex <- bind_cols(anova_ex, pooled_anova_fit_ac)
+anova_ex <- anova_ex[, c(1, 3, 4, 5, 6, 7, 2, 8, 9, 10)]
+
+anova_ac
+anova_di
+anova_ui
+anova_ex
+```
+
+Interpretation
+
+Significant main effect for dv AC01 for CoT
+
+Significant main effect for dv DI01 and EX01 for RAG with improved partial eta for UI.
+
+
+<h3>Main Effect Contrasts</h3>
+
+```{r}
+
 ```
 
 
-
-
-
-
-
-Plots
-
-
-
-
-
-<h1>Factorial MANOVA</h1>
-MANOVA
-
-
-
-<h1>Factorial ANOVA for each factor</h1>
-
-
-
-<h2>Factorial ANOVA for Accountability</h2>
-
-
-<h2>Factorial ANOVA for Disclosure</h2>
-
-<h2>Factorial ANOVA for Usefulness</h2>
-
-<h2>Factorial ANOVA for Explainability</h2>
-
+Compare main effects using contrasts (emmeans())
+Estimated marginal means for main effects and then constrasts
 
 
 <h1>Concluding Remarks</h1>

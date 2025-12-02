@@ -67,7 +67,7 @@ cor_list_rel_cols <- lapply(list_of_rel_cols, function(df) polychoric(df)$rho)
 cor_list_rel_cols
 ```
 
-Since the correlation has been applied to the imputed data, one correlation point estimate must be pooled according to Van Buuren (2011). It has to noted that the following custom way of pooling via mean averaging does not fully pursue Rubin's rules. This is due that only the point estimate and not further statistical measures such as the standard error are considered (Rubin, 1987; Van Buuren, 2011). Another reason for this limited approach is that neither the mice nor the lavaan package deliver such functionality for polychoric correlation with imputed data at the date of this analysis (October/November 2025) (Van Buuren, 2011; Jorgensen, 2025). Acknowledging this limitation, the correlation analysis is continued on the basis of the point estimates.
+Since the correlation has been applied to the imputed data, one correlation point estimate must be pooled according to Van Buuren and Groothuis-Oudshoorn (2011). It has to noted that the following custom way of pooling via mean averaging does not fully pursue Rubin's rules. This is due that only the point estimate and not further statistical measures such as the standard error are considered (Rubin, 1987; Van Buuren and Groothuis-Oudshoorn, 2011). Another reason for this limited approach is that neither the mice nor the lavaan package deliver such functionality for polychoric correlation with imputed data at the date of this analysis (October/November 2025) (Van Buuren and Groothuis-Oudshoorn, 2011; Jorgensen, 2025). Acknowledging this limitation, the correlation analysis is continued on the basis of the point estimates.
 
 ```{r fig.width=8, fig.height=8}
 p_cor_pooled <- Reduce("+", cor_list_rel_cols) / length(cor_list_rel_cols)
@@ -79,7 +79,7 @@ dimnames(p_cor_pooled) <- list(
 corrplot(p_cor_pooled, method = 'circle', type = 'lower', insig='blank', addCoef.col ='black', number.cex = 0.9, tl.col = 'black', tl.cex = 0.9)
 ```
 
-At a first glance, the correlations between DI01_03 and DI01_02, EX01_04 and DI01_02 as well as EX01_04 and DI01_03 are close to + 1 indicating a monotonic, positive relationship. This indicates that if one of the items in the relationship has a high rating (close to 5), the other one has a high rating, too.
+At a first glance, the correlations between DI01_03 and DI01_02, EX01_04 and DI01_02 as well as EX01_04 and DI01_03 are close to + 1 indicating a monotonic, positive relationship. This indicates that if one of the items in the relationship has a high rating (close to 5), the other one has a high rating, too. This points to a lack of discriminant validity due to a potential multicollinearity as those factor correlations exceed 0.85 (Brown, 2015). As the latter ordinal CFA necessitates discriminant factors that are parsimonous (Brown, 2015), these correlations must be acknowledged later on.
 
 As four factors: accountability, disclosure, usefulness of information and explainability emerged upon literature, the items of each factor should have at least a moderate correlation > 0.5. This can partially be inspected by a stair-like blue pattern of almost all correlations between the items of the same dimension, e.g., AC01_01 - AC01_03. Especially for the accountability and disclosure factor the blue steps of the stair can be observed. In contrast, in most parts the correlation between items of different factors is rather low except for the items of usefulness and explainability which have both a moderate correlation around 0.5 with accountability items and disclosure items.
 
@@ -95,7 +95,7 @@ In contrast to other significance tests, the goal is not to reject the null hypo
 
 Since we are conducting ordinal variables in their response format (Carifio and Perla, 2007), with a rather small sample we use the robust "Weighted Least Square Means and Variances" estimator (WLSMV) (Brown, 2015; Bean, 2021). In the following the factor loadings for the four literature-founded factors of accountability, disclosure, usefulness, and explainability are examined.
 
-First, the subset list of the imputed items of these factors has to be transformed back into an mids object. In contrast to the prior correlation evaluation, using the mids object ensures that the standard errors as well as further statistical measures influenced by multiple imputation are considered in terms of a mira object (Van Buuren, 2011). Thus, m = 10 ordinal CFA analysis are conducted and pooled after analysis (Van Buuren, 2011; Jorgensen, 2025).
+First, the subset list of the imputed items of these factors has to be transformed back into an mids object. In contrast to the prior correlation evaluation, using the mids object ensures that the standard errors as well as further statistical measures influenced by multiple imputation are considered in terms of a mira object (Van Buuren and Groothuis-Oudshoorn, 2011). Thus, m = 10 ordinal CFA analysis are conducted and pooled after analysis (Van Buuren and Groothuis-Oudshoorn, 2011; Jorgensen, 2025).
 
 ```{r}
 mids_rel_cols <- datlist2mids(list_of_rel_cols)
@@ -205,7 +205,7 @@ est
 
 Each factor is evaluated in its sequence of appearance, if specific items distinguish from the others of the same factor in any of the following criteria to-be validated, the item is evaluated in a deep dive. The following criteria aligns with the sequence suggested by Brown (2015) on the pages 107-116 which is verified by Kline (2016):
 <ol>
-<li>Check the magnitude/size of the est: is the factor salient (> 0.3), no out of range values, no Heywood cases, i.e., no factor loadings >1, no negative values (Brown, 2015). If such a case occurs for one of the 95 % confidence intervals, it is noted but not considered a knock-out criteria due to the uncertainty implied by the imputed data foundation (Van Buuren, 2011), and the only moderate sample size for WLSMV (Brown, 2015).</li>
+<li>Check the magnitude/size of the est: is the factor salient (> 0.3), no out of range values, no Heywood cases, i.e., no factor loadings >1, no negative values (Brown, 2015). If such a case occurs for one of the 95 % confidence intervals, it is noted but not considered a knock-out criteria due to the uncertainty implied by the imputed data foundation (Van Buuren and Groothuis-Oudshoorn, 2011), and the only moderate sample size for WLSMV (Brown, 2015).</li>
 <li>Check the direction: all est must be positive for their factor.</li>
 <li>Check the se and t-test, i.e., how much sampling error is within the estimates and thus, the stability of the est.</li>
 </ol>
@@ -252,7 +252,7 @@ To complete the picture, the parameter estimates are evaluated. The estimates su
 <li>Explainability: EX01_02, EX01_03, EX01_04</li>
 </ul>
 
-In line with these results the following model respecification is suggested from a statistical point of view. It has to be noted that also the results of the polychoric correlation matrix are considered which state potential connections of items with a high correlation and underpin the at hand findings:
+In line with these results the following model respecification is suggested from a statistical point of view. It has to be noted that also the results of the polychoric correlation matrix are considered which state potential connections of items with a high correlation, i.e., multicollinearity (Brown, 2015), and underpin the at hand findings:
 
 <ul>
 <li>Accountability: AC01_01, AC01_02, AC01_03</li>
@@ -261,7 +261,7 @@ In line with these results the following model respecification is suggested from
 <li>Explainability: EX01_02, EX01_03, UI01_04</li>
 </ul>
 
-Accountability is kept as is which is in line with the observations. Whereas the suggestion of the parameter estimate observation for disclosure is transferred into the respecification expanded by the reassignment of EX01_04. The UI01_01 assignment to disclosure is omitted fully due to the drop of DI01_01 which is possibly the reason for the suggested reassignment by modification due a high correlation. This correlation is with ≈ 0.55 higher than to the other items of disclosure (≈ 0.13, ≈ 0.15, ≈ 0.16). Moreover, UI01_04 is assigned to explainability instead because of the only minor difference in MI improvement compared to an disclosure assignment and the slightly higher correlation of ≈ 0.62 with EX01_03. In parallel the suggestion of the parameter estimates is applied suggesting to keep only two out of four items.
+Accountability is kept as is which is in line with the observations. Whereas the suggestion of the parameter estimate observation for disclosure is transferred into the respecification expanded by the reassignment of EX01_04. Instead of collapsing the factors with a high multicollinearity (Brown, 2015), the literature suggests to keep all three DI01_02, DI01_03, and EX01_04 distinct as they all point to different aspects of source availability. Thus, the rationale overweighs the statistical observations (Brown, 2015). The UI01_01 assignment to disclosure is omitted fully due to the drop of DI01_01 which is possibly the reason for the suggested reassignment by modification due a high correlation. This correlation is with ≈ 0.55 higher than to the other items of disclosure (≈ 0.13, ≈ 0.15, ≈ 0.16). Moreover, UI01_04 is assigned to explainability instead because of the only minor difference in MI improvement compared to an disclosure assignment and the slightly higher correlation of ≈ 0.62 with EX01_03. In parallel the suggestion of the parameter estimates is applied suggesting to keep only two out of four items.
 
 However, this respecification has to be critically reviewed in line with literature findings as we aim to confirm theory with statistics and not in reverse (Brown, 2015). As accountability is kept as-is, literature findings are confirmed. As the items of disclosure all revere to revealing references the reassignment is in line with literature, too. As usefulness is solely reduced, this is in line with the literature, too. The assignment of UI01_04 is further verified due to the effect of the explainability items which due to revealing steps and interactions request the user to interact. This evaluation can be inspected in more detail within the thesis. 
 
@@ -328,7 +328,7 @@ est_refit
 ```
 In line with the sequence of analysis for the initial CFA, the est values are analyzed first. The analysis shows that all items are salient, i.e., above the threshold of 0.4 (Brown, 2015). Besides, the point into the same positive direction for each factor. 
 
-It has to be noted that AC01_03 undercuts the threshold for ci.lower slightly and that three of the items (DI01_02, UI01_02, EX01_03) depict potential Heywood cases for their ci.upper values which exceed 1.0. As stated previously, this is not considered a knock-out criteria due to the uncertainty of imputed data (Van Buuren, 2011), and the moderate sample size for the WLSMV estimator (Brown, 2015).
+It has to be noted that AC01_03 undercuts the threshold for ci.lower slightly and that three of the items (DI01_02, UI01_02, EX01_03) depict potential Heywood cases for their ci.upper values which exceed 1.0. As stated previously, this is not considered a knock-out criteria due to the uncertainty of imputed data (Van Buuren and Groothuis-Oudshoorn, 2011), and the moderate sample size for the WLSMV estimator (Brown, 2015).
 
 The se values range from ≈ 0.015 to ≈ 0.085 indicating a rather small measurement error. Moreover, the t-values ranging from ≈ 6.138 to ≈ 65.441 indicate an adequate stability across the model which is further amplified by dfs ranging from ≈ 50.641 to ≈ 3545.297.
 
