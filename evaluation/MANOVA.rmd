@@ -34,6 +34,7 @@ library(mvnormalTest)
 library(biotools)
 library(car)
 library(effectsize)
+library(emmeans)
 ```
 
 <h1>Sample Load and Data Preparation</h1>
@@ -389,7 +390,7 @@ H01: For the main effects: the mean vector of the dependent variables is equal a
 <li>H01b: The inference treatment of CoT does not have a multivariate effect on any dimension of transparency.</li>
 </ul>
 </li>
-<li>H02: For the interaction effects: the combination of independent variable groups does not lead to additional effects compared to their singular application, i.e. the combination of treatments (CoT and RAG) has an equal effect on any dimension of transparency as if the treatments were applied alone.</li>
+<li>H02: For the interaction effects: the combination of independent variable groups does not lead to any additional effects compared to their singular application, i.e. the combination of treatments (CoT and RAG) has an equal effect on any dimension of transparency as if the treatments were applied alone.</li>
 </ul>
 For each null hypotheses and further statistical test, a significance level alpha of 0.05 is assumed.
 
@@ -524,34 +525,24 @@ levene_test
 In contrast to the multivariate test statistics, the univariate H0 is likely to be accepted. As even the test statistic result whose p-value is closest to 0, points on accepting H0. This test statistic for the tenth imputed dataset's group 7 which is the group CoTxRAG with 3 df (as all other test statistics) and an F-value ≈ 1.8371 followed by a p-value ≈ 0.1437. Hence, the conclusion is made that H0 is likely to be accepted that all variances are homogeneous for a significance value of 0.05. This is further reinforced by the prior descriptive statistics which already indicated only a minor difference in variance among the independent groups.
 
 <h2>Two-way MANOVA</h2>
+The applied sequence of work aligns to the proposal of Kang and Jin (2016) on how to proceed with factorial MANOVA. This proposal and the at hand findings led to the following sequence:
+<ol>
+<li>Factorial MANOVA,</li>
+<li>Factorial ANOVA,</li>
+<li>Post-hoc factorial ANOVA main effect analysis (Kang and Jin, 2016).</li>
+</ol
+
 On the basis of the prior analysis, we can assume a non-normality and heterogeneity for the at hand unbalanced data sample consisting of 10 imputed datasets. Against this background, a test statistic for the following two-way MANOVA must be selected out of four potential test statistics: Roy’s largest root, Hotelling’s trace, Wilk’s lambda, Pillai’s trace (Kang and Jin, 2016).
 
-Pillai’s trace is chosen as a test statistic for the at hand two-way MANOVA. It reveals to be the appropriate fit in line with the literature findings within the thesis and the statistical results so far which indicate a non-normality and heterogeneity against the backdrop of an unbalanced sample.
+Pillai’s trace is chosen as a test statistic for the at hand two-way MANOVA. It reveals to be the appropriate fit in line with the literature findings within the thesis and the statistical results so far.
 
-The two-way MANOVA is conducted on the basis of a mids object which captures the uncertainty of the imputation process sufficiently within the MANOVA analysis (Van Buuren and Groothuis-Oudshoorn, 2011). The model is constructed on the basis of the two factors: inference and post-training which are transformed in line with their two-levels each - including Vanilla - into CoT and RAG. Thus, the model to be evaluated is:
+The model is constructed on the basis of the two factors: inference and post-training which are transformed in line with their two-levels each - including Vanilla - into CoT and RAG. Thus, the model to be evaluated is:
 
-AC01_SCORE, DI01_SCORE, UI01_SCORE, EX01_SCORE = grand mean (=Intercept which includes Vanilla) + CoT + RAG + CoT*RAG + residual error.
+AC01_SCORE, DI01_SCORE, UI01_SCORE, EX01_SCORE (=dimensions) = grand mean (=Intercept which includes Vanilla) + CoT + RAG + CoT * RAG + residual error.
 
-This model is constructed according to Zhang (2011) who also conducted a two-way MANOVA. The following code shows a glimpse using a pooled mipo object with type II treatment sum of squares calculation which is dependent on the order of factors (Kaltenbach, 2021). RAG0 or CoT0 show the ... (Vanilla not significant). ... Only second rows show a glimpse for significance for main effects for the model - whereas RAG is significant and CoT not indicating first signs that only one main effect hypothesis can be rejected. No interaction effect in both cases. <SCHÖN SCHREIBEN MIT ZAHLEN!!!!!!!>
+This model is constructed according to Zhang (2011) who also conducted a two-way MANOVA. The two-way MANOVA is calculated using the manova() function of the R built-in stats package. The manova() implicitly includes most parts of a model similarly as the aov()/anova() function leading to a simplified model of "dimension(s) = CoT * RAG" (Kaltenbach, 2021). 
 
-```{r}
-f1 <- with(mids_coded, lm(cbind(AC01_SCORE, DI01_SCORE, UI01_SCORE, EX01_SCORE) ~ RAG + CoT + CoT * RAG - 1))
-
-f2 <- with(mids_coded, lm(cbind(AC01_SCORE, DI01_SCORE, UI01_SCORE, EX01_SCORE) ~ CoT + RAG + CoT * RAG - 1))
-
-#pool(f1)
-#pool(f2)
-
-as.data.frame(summary(pool(f1)))
-as.data.frame(summary(pool(f2)))
-```
-
-The following sequence of work aligns with ...
-
-First two-way MANOVA, if a significant interaction effect is observed then one-way MANOVA for all independent vars, i.e., RAG and CoT:RAG. If no significant interaction; factorial ANOVA for each dependent var. If no significant interaction here, too -> 
-
-....
-
+The two-way MANOVA is conducted on the basis of a mids object which captures the uncertainty of the imputation process sufficiently within the MANOVA analysis (Van Buuren and Groothuis-Oudshoorn, 2011):
 
 ```{r}
 manova_fit <- with(mids_coded, manova(cbind(AC01_SCORE, DI01_SCORE, UI01_SCORE, EX01_SCORE) ~ CoT * RAG))
@@ -560,7 +551,7 @@ manova_model <- summary(manova_fit, test = c("Pillai"))
 manova_model
 ```
 
-Pooling - ....
+For interpretation purposes, the F-statistic (column: "statistic") is pooled as a mipo object for all factor levels, i.e., CoT, RAG, and the interaction CoT:RAG and combined as an mira object in line with Van Buuren and Groothuis-Oudshoorn (2011):
 
 ```{r}
 # Extract all F-statistics for each level and combination, i.e., 10 F-statistic values for each treatment
@@ -574,7 +565,7 @@ pooled_F_stats_RAG <- micombine.F(manova_stats_RAG, df = 10)
 pooled_F_stats_CoTxRAG <- micombine.F(manova_stats_CoTxRAG, df = 10)
 ```
 
-For visualization and interpretation purposes, these pooled values are depicted within a MANOVA table as follows.
+For visualization and interpretation purposes, the values are depicted within a MANOVA-like table as follows:
 
 ```{r}
 # Combine pooled results within a table
@@ -598,13 +589,12 @@ pooled_manova <- pooled_manova %>%
 pooled_manova
 ```
 
-Interpretation:
-two significant main effects - no interaction effect
+The pooled MANOVA results indicate soley significant main effects and no significant interaction effect according to a significance level alpha = 0.05. For CoT, a pooled F(10, 678) ≈ 1.8558, p ≈ 0.0483 indicates a significant main effect rejecting the H01b leading to the assumption that the CoT treatment has a multivariate effect on the dimensions of transparency. For RAG, a pooled F(10, 10) ≈ 23.6102, p < 0.0001 indicates a significant main effect rejecting the H01a leading to the assumption that the RAG treatment has an even stronger multivariate effect on the dimensions of transparency. As the interaction CoT:RAG with F(10, 114) ≈ 0.4336, p ≈ 0.9273 indicates no significant interaction effect, the test fails to reject H02. This indicates that it is likely that the CoT enhanced by RAG leads no synergy effects in improving transparency. 
 
-
+The latter observation leads to a factorial ANOVA for each dependent variable, i.e., transparency dimension, in line with the workflow of Kang and Jin (2016).
 
 <h2>Factorial ANOVA</h2>
-Between groups check ...
+The factorial ANOVAs are applied to all imputed data as with factorial MANOVA (Rubin, 1987; Van Buuren and Groothuis-Oudshoorn, 2011). Contrary to MANOVA, not only the F-statistics are pooled, but whole ANOVA’s are pooled using a built-capability of the miceadds package in R (Robitzsch, Grund and Henke, 2025). This allows to use the type II sum of squares method for the pooled ANOVA calculation (Robitzsch, Grund and Henke, 2025). The pooling also delivers the effect size measures (partial) eta squared based on the variance explained (r squared) (Robitzsch, Grund and Henke, 2025). Although, solely the partial eta squared metric is examined (Kaltenbach, 2021).
 
 ```{r}
 # Listed ANOVAS across all imputed datasets
@@ -619,10 +609,10 @@ summary(anova_fit_list_ui)
 summary(anova_fit_list_ex)
 
 # Pooled ANOVAS
-pooled_anova_fit_ac <- mi.anova(mi.res = mids_coded, formula = "AC01_SCORE ~ CoT * RAG", type = 3)
-pooled_anova_fit_di <- mi.anova(mi.res = mids_coded, formula = "DI01_SCORE ~ CoT * RAG", type = 3)
-pooled_anova_fit_ui <- mi.anova(mi.res = mids_coded, formula = "UI01_SCORE ~ CoT * RAG", type = 3)
-pooled_anova_fit_ex <- mi.anova(mi.res = mids_coded, formula = "EX01_SCORE ~ CoT * RAG", type = 3)
+pooled_anova_fit_ac <- mi.anova(mi.res = mids_coded, formula = "AC01_SCORE ~ CoT * RAG", type = 2)
+pooled_anova_fit_di <- mi.anova(mi.res = mids_coded, formula = "DI01_SCORE ~ CoT * RAG", type = 2)
+pooled_anova_fit_ui <- mi.anova(mi.res = mids_coded, formula = "UI01_SCORE ~ CoT * RAG", type = 2)
+pooled_anova_fit_ex <- mi.anova(mi.res = mids_coded, formula = "EX01_SCORE ~ CoT * RAG", type = 2)
 
 # R-squared values for each pooled ANOVA table
 print(pooled_anova_fit_ac$r.squared)
@@ -644,19 +634,19 @@ anova_ac <- anova_ac[, c(1, 3, 4, 5, 6, 7, 2, 8, 9, 10)]
 anova_di <- data_frame(
   DI01 = c("CoT", "RAG", "CoT:RAG", "Residual")
 )
-anova_di <- bind_cols(anova_di, pooled_anova_fit_ac)
+anova_di <- bind_cols(anova_di, pooled_anova_fit_di)
 anova_di <- anova_di[, c(1, 3, 4, 5, 6, 7, 2, 8, 9, 10)]
 
 anova_ui <- data_frame(
   UI01 = c("CoT", "RAG", "CoT:RAG", "Residual")
 )
-anova_ui <- bind_cols(anova_ui, pooled_anova_fit_ac)
+anova_ui <- bind_cols(anova_ui, pooled_anova_fit_ui)
 anova_ui <- anova_ui[, c(1, 3, 4, 5, 6, 7, 2, 8, 9, 10)]
 
 anova_ex <- data_frame(
   EX01 = c("CoT", "RAG", "CoT:RAG", "Residual")
 )
-anova_ex <- bind_cols(anova_ex, pooled_anova_fit_ac)
+anova_ex <- bind_cols(anova_ex, pooled_anova_fit_ex)
 anova_ex <- anova_ex[, c(1, 3, 4, 5, 6, 7, 2, 8, 9, 10)]
 
 anova_ac
@@ -665,23 +655,97 @@ anova_ui
 anova_ex
 ```
 
-Interpretation
+For the dependent variable of accountability (AC01_SCORE), only the main effect of CoT is likely to be significant with F(1, 10375) ≈ 4.7799, p ≈ 0.0288, partial.eta2 ≈ 0.03768. This indicates that the CoT treatment is likely to influence the accountability dimension of transparency with a different mean compared to the other groups. Although, the low partial.eta2 value of ≈ 3.8 % points to a low impact of the treatment's characteristics on the overall variation of the dimension. The high sum of squared errors for the residual indicates only slight differences among treatment groups.
 
-Significant main effect for dv AC01 for CoT
+For the dependent variable of disclosure (DI01_SCORE), only the main effect of RAG is likely to be significant with F(1, 59) ≈ 164.7453, p < 0.0001, partial.eta2 ≈ 0.679621. These metrics indicate that the mean value of RAG varies significantly compared to the other treatments. Moreover, the RAG treatment can be expected to influence the dimension of disclosure heavily which is underpinned by relatively high partial.eta2 value that indicates that in ≈ 68.0 % the overall variation of the dimension is impacted by RAG.
 
-Significant main effect for dv DI01 and EX01 for RAG with improved partial eta for UI.
+For the dependent variable of usefulness of information (UI01_SCORE) no significant effect is detected. However, as the residual sum of squarred errors is higher than for each effect the variation of this dimension remains unexplained and for this dimension there are no differences that can be appointed towards any treatment group (Kaltenbach, 2021).
 
+For the dependent variable of explainability (EX01_SCORE), RAG reveals likely to be the only significant main effect again with F(1, 32255) ≈ 13.6770, p ≈ 0.0002, partial.eta2 ≈ 0.0989. This indicates a different mean for RAG and an impact of ≈ 9.9 % according to partial.eta2 on this dimension's variation. The high sum of squared errors for the residual indicates only slight differences among treatment groups.
 
-<h3>Main Effect Contrasts</h3>
+As the main effects repeatedly proved likely to be responsible for the differences in variations of each dependent variable except for usefulness of information (UI01_SCORE), a post-hoc analysis of main effect contrasts is conducted.
+
+<h3>Post-Hoc Main Effect Contrasts</h3>
+To verify the prior results, a post-hoc main effect contrast analysis is conducted. In contrast to the beforehand analysis, the linear contrasts analysis provides a detailed view on how the main effects differ. The foundation for contrast analysis is set through the calculation of estimated marginal means. (Kaltenbach, 2021)
+
+In line with Kaltenbach (2021) the full model for each dimension: "AC01_SCORE | DI01_SCORE | UI01_SCORE | EX01_SCORE ~ CoT + RAG + CoT * RAG" is used to calculate respective estimated marginal means. Moreover, the prior set coding is reused again for the the calculations. Due to the unbalanced setting, Kang and Jin (2016) suggest to use the method by Sidak to adjust respective confidence intervals.
 
 ```{r}
+model_ac <- with(mids_coded, lm(AC01_SCORE ~ CoT + RAG + CoT * RAG))
+model_di <- with(mids_coded, lm(DI01_SCORE ~ CoT + RAG + CoT * RAG))
+model_ui <- with(mids_coded, lm(UI01_SCORE ~ CoT + RAG + CoT * RAG))
+model_ex <- with(mids_coded, lm(EX01_SCORE ~ CoT + RAG + CoT * RAG))
+
+# Lay the foundation for estimated marginal means calculation - check it once
+reference <- ref_grid(model_ac)
+reference
+
+# Calculate estimated marginal means on the basis of the reference
+estimated_marginal_means_ac <- emmeans(model_ac, ~ CoT + RAG + CoT * RAG, adjust = "sidak")
+estimated_marginal_means_di <- emmeans(model_di, ~ CoT + RAG + CoT * RAG, adjust = "sidak")
+estimated_marginal_means_ui <- emmeans(model_ui, ~ CoT + RAG + CoT * RAG, adjust = "sidak")
+estimated_marginal_means_ex <- emmeans(model_ex, ~ CoT + RAG + CoT * RAG, adjust = "sidak")
+
+# Output
+estimated_marginal_means_ac
+estimated_marginal_means_di
+estimated_marginal_means_ui
+estimated_marginal_means_ex
 
 ```
 
+As the means have already been interpreted within the descriptive analysis, these observations solely serve as a foundation for the contrast analysis that follows. For each contrast a two-sided t-test combined with a resulting p-value is calculated. The overarching goal of the main effect contrast analysis is to verify prior F-test results of (M)ANOVA and to show the degree of difference of respective main effects to other treatment groups. Thus, the aim is to reject the null hypothesis:
+H0: All contrasts = 0. 
+For adjusting the p-values to the characteristics of the sample and to post-hoc testing, the Scheffe correction is used. (Kaltenbach, 2021)
 
-Compare main effects using contrasts (emmeans())
-Estimated marginal means for main effects and then constrasts
+Only the already after the prior analysis likely effects are examined. Except for the case that a new effect reveals to be significant.  
 
+```{r}
+contrasts_examined <- list(
+  "Vanilla vs. CoT" = c(1, -1, 0, 0),
+  "Vanilla vs. RAG" = c(1, 0, -1, 0),
+  "CoT (Inference) vs. RAG (Post-Training)" = c(0, 1, -1, 0)
+)
 
-<h1>Concluding Remarks</h1>
+# Calculate main effect contrasts
+main_effect_contrasts_ac <- contrast(estimated_marginal_means_ac, method = contrasts_examined, adjust = "scheffe")
+main_effect_contrasts_di <- contrast(estimated_marginal_means_di, method = contrasts_examined, adjust = "scheffe")
+main_effect_contrasts_ui <- contrast(estimated_marginal_means_ui, method = contrasts_examined, adjust = "scheffe")
+main_effect_contrasts_ex <- contrast(estimated_marginal_means_ex, method = contrasts_examined, adjust = "scheffe")
 
+# Add t-tests, p-values, confidence intervals
+main_effect_contrasts_ac_res <- summary(
+  main_effect_contrasts_ac,
+  infer = c(TRUE, TRUE)
+  )
+main_effect_contrasts_di_res <- summary(
+  main_effect_contrasts_di, 
+  infer = c(TRUE, TRUE)
+  )
+main_effect_contrasts_ui_res <- summary(
+  main_effect_contrasts_ui, 
+  infer = c(TRUE, TRUE)
+  )
+main_effect_contrasts_ex_res <- summary(
+  main_effect_contrasts_ex, 
+  infer = c(TRUE, TRUE)
+  )
+
+# Display contrasts
+main_effect_contrasts_ac_res
+main_effect_contrasts_di_res
+main_effect_contrasts_ui_res
+main_effect_contrasts_ex_res
+```
+
+For the accountability dimension (AC01_SCORE), the main effect of CoT is examined. The post-hoc analysis for accountability reveals no significant differences between Vanilla and CoT, p ≈ 0.6077 (mean_diff ≈ 0.1680, 95%-CI[-0.248, 0.585]) and between CoT and RAG, p ≈ 0.4112 (mean_diff ≈ -0.2374, 95%-CI[-0.677, 0.202]). Consequently, the assumption of likely significant CoT main effect for accountability is withdrawn due to a likely non-significance revealed through contrast analysis despite a likely rejection of the null hypothesis.
+
+However, the main effect of RAG for the dimension of disclosure (DI01_SCORE) is likely to be verified by contrast analysis. This is due to a significant difference between Vanilla and RAG, p < 0.0001 (mean_diff ≈ -2.498, 95%-CI[-3.045, -1.951]) and between CoT and RAG, p < 0.0001 (mean_diff ≈ -2.382, 95%-CI[-2.907, -1.857]). Those values indicate that the estimated mean differs ≈ 2 ratings between RAG and the other two treatment groups within the upper CI even around 3 points. It has to be noted that the higher SEs of disclosure compared to the SEs of accountability and usefulness of information lead to increased CIs. Nevertheless, and underpinned by the prior descriptive analysis, the main effect of RAG is verified to be likely significant. Consequently, the null hypothesis is rejected.
+
+For usefulness of information (UI01_SCORE), the non-significance of all treatment groups is likely to be assumed. An example for this is the non-significant difference between Vanilla and CoT, p ≈ 0.9925 (mean_diff ≈ -0.0171, 95%-CI[-0.362, 0.328]). Nevertheless, the null hypothesis is rejected.
+
+For the explainability dimension (EX01_SCORE), the significance assumption of RAG is likely to be declined on the basis of the contrast analysis' results. The post-hoc analysis for explainability shows no significant differences between Vanilla and RAG, p ≈ 0.1673 (mean_diff ≈ -0.4740, 95%-CI[-1.091, 0.143]) and between CoT and RAG, p ≈ 0.1251 (mean_diff ≈ -0.5061, 95%-CI[-1.116, 0.104]). The highest SEs compared to the other dependent variables' SEs lead to broad CIs that might indicate potential significant differences, e.g., differences of 1 rating point for RAG compared to other treatment groups. Due to the high SEs these CI values can be neglected. The previously as likely recognized significant effect of RAG on the dimension of explainability is likely to be non-significant. The null hypothesis is rejected.
+
+To conclude after all observations, only the main effect of RAG for the dependent variable of disclosure (DI01_SCORE) showed a moderate likelihood of significance. Whereas main effects that were perceived likely significant after factorial ANOVA are more likely to be non-significant, i.e., main effect of CoT on accountability and main effect of RAG on explainability. For the dependent variable of usefulness of information no significant effects seemed to be prevalent which refers to negligible differences between each treatments' effects. 
+
+The at hand results lays the foundation for the discussion within the thesis.
