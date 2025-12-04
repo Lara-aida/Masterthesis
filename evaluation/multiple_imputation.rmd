@@ -70,8 +70,8 @@ df_na <- data.frame(
   )
 
 for (col_name in relevant_columns) {
-  absolute_NA <- sum(is.na(draft_data[[col_name]]))
-  relative_NA <- round(absolute_NA * 100 / nrow(draft_data), 2)
+  absolute_NA <- sum(is.na(data_with_NA[[col_name]]))
+  relative_NA <- round(absolute_NA * 100 / nrow(data_with_NA), 2)
   
   df_na <- rbind(df_na, data.frame(
     item = col_name,
