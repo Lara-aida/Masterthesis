@@ -43,7 +43,7 @@ First, the previously imputed data is loaded as a mids object:
 ```{r}
 getwd()
 final_imputed_data <- read_rds("data/mi_mids_object.rds")
-glimpse(final_imputed_data)
+glimpse(final_imputed_data[1])
 ```
 
 As MANOVA is a parametric method that is applied to analyze differences between multiple, continuous dependent variables, the means for each factor of the four factors are calculated first (Kang and Jin, 2016). Although, the calculation of the mean on the basis of an ordinal scale necessitates "a collection of purposefully constructed items" [p. 109] on the macro scale (Carifio and Perla, 2007). On the basis of this measurement scale perspective, means as parametric statistical structures can be constructed on the foundation of the items assigned to the purposeful factors (Carifio and Perla, 2007). These factors are verified in their purpose through the previously conducted ordinal CFA. Consequently, the following measurement model serves as a basis for the following mean calculation per factor:
@@ -63,11 +63,11 @@ factor_relevant_cols <- c("AC01_01", "AC01_02", "AC01_03",
                              "UI01_01", "UI01_02", 
                              "EX01_02", "EX01_03", "UI01_04")
 treatment_col <- c("TR01")
-total_cols <- c(factor_relevant_cols, treatment)
+total_cols <- c(factor_relevant_cols, treatment_col)
 
 list_of_fac_rel_cols <- lapply(complete(final_imputed_data, "all"), function(df) df[, total_cols])
 
-glimpse(list_of_fac_rel_cols)
+glimpse(list_of_fac_rel_cols[1])
 ```
 
 In addition, four new columns are introduced for each factor in which the calculated mean is stored for each imputed dataset. These four resulting additional variables depicted as value columns are the dependent variables to be conducted (Kang and Jin, 2016; Kaltenbach, 2021):
@@ -87,7 +87,7 @@ list_factor_mean_cols <- lapply(list_of_fac_rel_cols, function(df) {
         rename(treatment = TR01)
 })
 
-list_factor_mean_cols
+list_factor_mean_cols[1]
 ```
 
 For an improved clarity of the latter visual analysis of the descriptive statistics (boxplots) as well as the (M)ANOVA investigations, the treatment column is recoded (1 = Vanilla, 2 = CoT, 3 = RAG, 4 = CoTxRAG). Therefore, another list "analysis_list_factor_mean_cols" is created upon the by means expanded original list of imputed datasets "list_factor_mean_cols".
@@ -112,14 +112,14 @@ analysis_list_factor_mean_cols <- lapply(list_factor_mean_cols, function(df) {
       
 })
 
-analysis_list_factor_mean_cols
+analysis_list_factor_mean_cols[1]
 ```
 
 This transformed and by means expanded list of the imputed factor items has to be transformed back into an mids object for the latter post-check factorial ANOVA which can be applied to mira objects (Robitzsch et al., 2025). As stated before for the ordinal CFA, using the mids object ensures that the standard errors as well as further statistical measures influenced by multiple imputation are considered in terms of a mira object (Van Buuren, 2011).
 
 ```{r}
 mids_analysis_factor_mean_cols <- datlist2mids(analysis_list_factor_mean_cols)
-glimpse(mids_analysis_factor_mean_cols)
+glimpse(mids_analysis_factor_mean_cols[1])
 ```
 
 <h1>Descriptive Statistics</h1>
@@ -174,7 +174,8 @@ sum_ui01_plot <- ggplot(analysis_summary_df, aes(treatment, UI01_SCORE, color=tr
 sum_ex01_plot <- ggplot(analysis_summary_df, aes(treatment, EX01_SCORE, color=treatment)) + geom_boxplot() + stat_boxplot(geom='errorbar',coef=5) + geom_jitter(width = 0.2) + ylim(1, 5)
 
 
-ggarrange(sum_ac01_plot, sum_di01_plot, sum_ui01_plot, sum_ex01_plot, ncol=2, nrow=2, common.legend = TRUE, legend = "right")
+sum_of_all <- ggarrange(sum_ac01_plot, sum_di01_plot, sum_ui01_plot, sum_ex01_plot, ncol=2, nrow=2, common.legend = TRUE, legend = "right")
+sum_of_all
 ```
 
 As the questionnaire only allows to answer on a Likert scale 1-5 ordinal response format with 1 indicating the highest disagreement and 5 in reverse, the medians and values interpreted below are rounded, i.e., 2.5 ≈ 3.
@@ -432,7 +433,7 @@ analysis_list_factor_mean_cols_coded <- lapply(analysis_list_factor_mean_cols, f
                  levels = c(0, 1))
         )})
 
-analysis_list_factor_mean_cols_coded
+analysis_list_factor_mean_cols_coded[1]
 
 # Transformed back into a mids
 mids_coded <- datalist2mids(analysis_list_factor_mean_cols_coded)
@@ -691,7 +692,6 @@ estimated_marginal_means_ac
 estimated_marginal_means_di
 estimated_marginal_means_ui
 estimated_marginal_means_ex
-
 ```
 
 As the means have already been interpreted within the descriptive analysis, these observations solely serve as a foundation for the contrast analysis that follows. For each contrast a two-sided t-test combined with a resulting p-value is calculated. The overarching goal of the main effect contrast analysis is to verify prior F-test results of (M)ANOVA and to show the degree of difference of respective main effects to other treatment groups. Thus, the aim is to reject the null hypothesis:
@@ -749,3 +749,38 @@ For the explainability dimension (EX01_SCORE), the significance assumption of RA
 To conclude after all observations, only the main effect of RAG for the dependent variable of disclosure (DI01_SCORE) showed a moderate likelihood of significance. Whereas main effects that were perceived likely significant after factorial ANOVA are more likely to be non-significant, i.e., main effect of CoT on accountability and main effect of RAG on explainability. For the dependent variable of usefulness of information no significant effects seemed to be prevalent which refers to negligible differences between each treatments' effects. 
 
 The at hand results lays the foundation for the discussion within the thesis.
+
+<h1>Save Results</h1>
+
+```{r}
+sum_of_all_save <- save(sum_of_all, file = "MANOVA_storage/sum_of_all.RData")
+descriptive_stats_save <- save(descriptive_stats, file = "MANOVA_storage/descriptive_stats.RData")
+analysis_list_factor_mean_cols_coded_save <- save(analysis_list_factor_mean_cols_coded, file = "MANOVA_storage/analysis_list_factor_mean_cols_coded.RData")
+manova_model_save <- save(manova_model, file = "MANOVA_storage/manova_model.RData")
+pooled_manova_save <- save(pooled_manova, file = "MANOVA_storage/pooled_manova.RData")
+anova_fit_list_ac_save <- save(anova_fit_list_ac, file = "MANOVA_storage/anova_fit_list_ac.RData")
+anova_fit_list_di_save <- save(anova_fit_list_di, file = "MANOVA_storage/anova_fit_list_di.RData")
+anova_fit_list_ui_save <- save(anova_fit_list_ui, file = "MANOVA_storage/anova_fit_list_ui.RData")
+anova_fit_list_ex_save <- save(anova_fit_list_ex, file = "MANOVA_storage/anova_fit_list_ex.RData")
+pooled_anova_fit_ac_save <- save(pooled_anova_fit_ac, file = "MANOVA_storage/pooled_anova_fit_ac.RData")
+pooled_anova_fit_di_save <- save(pooled_anova_fit_di, file = "MANOVA_storage/pooled_anova_fit_di.RData")
+pooled_anova_fit_ui_save <- save(pooled_anova_fit_ui, file = "MANOVA_storage/pooled_anova_fit_ui.RData")
+pooled_anova_fit_ex_save <- save(pooled_anova_fit_ex, file = "MANOVA_storage/pooled_anova_fit_ex.RData")
+estimated_marginal_means_ac_save <- save(estimated_marginal_means_ac, file = "MANOVA_storage/estimated_marginal_means_ac.RData")
+estimated_marginal_means_di_save <- save(estimated_marginal_means_di, file = "MANOVA_storage/estimated_marginal_means_di.RData")
+estimated_marginal_means_ui_save <- save(estimated_marginal_means_ui, file = "MANOVA_storage/estimated_marginal_means_ui.RData")
+estimated_marginal_means_ex_save <- save(estimated_marginal_means_ex, file = "MANOVA_storage/estimated_marginal_means_ex.RData")
+main_effect_contrasts_ac_res_save <- save(main_effect_contrasts_ac_res, file = "MANOVA_storage/main_effect_contrasts_ac_res.RData")
+main_effect_contrasts_di_res_save <- save(main_effect_contrasts_di_res, file = "MANOVA_storage/main_effect_contrasts_di_res.RData")
+main_effect_contrasts_ui_res_save <- save(main_effect_contrasts_ui_res, file = "MANOVA_storage/main_effect_contrasts_ui_res.RData")
+main_effect_contrasts_ex_res_save <- save(main_effect_contrasts_ex_res, file = "MANOVA_storage/main_effect_contrasts_ex_res.RData")
+```
+
+
+<h1>Latex Exports</h1>
+
+```{r}
+
+```
+
+

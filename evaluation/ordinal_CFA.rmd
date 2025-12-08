@@ -31,7 +31,7 @@ First, the previously imputed data is loaded as a mids object:
 ```{r}
 getwd()
 final_imputed_data <- read_rds("data/mi_mids_object.rds")
-glimpse(final_imputed_data)
+glimpse(final_imputed_data[1])
 ```
 
 Subsequently, the imputed data is reduced onto the for the CFA analysis relevant columns, i.e., items. The reduction is completed by using the lapply() function that allows to turn the mids object into the subset/list of items. Thus, the analysis still represents the missingness in response through directly using the multiple imputed data which represents the uncertainty as outlined, previously (Li, Stuart and Allison, 2015).
@@ -41,7 +41,7 @@ relevant_columns <- c("AC01_01", "AC01_02", "AC01_03", "DI01_01", "DI01_02", "DI
 
 list_of_rel_cols <- lapply(complete(final_imputed_data, "all"), function(df) df[, relevant_columns])
 
-glimpse(list_of_rel_cols)
+glimpse(list_of_rel_cols[1])
 ```
 
 <h1>Ordinal Confirmatory Factor Analysis</h1>
@@ -64,7 +64,6 @@ First, the polychoric correlation is applied to the list of imputed item data. T
 
 ```{r}
 cor_list_rel_cols <- lapply(list_of_rel_cols, function(df) polychoric(df)$rho)
-cor_list_rel_cols
 ```
 
 Since the correlation has been applied to the imputed data, one correlation point estimate must be pooled according to Van Buuren and Groothuis-Oudshoorn (2011). It has to noted that the following custom way of pooling via mean averaging does not fully pursue Rubin's rules. This is due that only the point estimate and not further statistical measures such as the standard error are considered (Rubin, 1987; Van Buuren and Groothuis-Oudshoorn, 2011). Another reason for this limited approach is that neither the mice nor the lavaan package deliver such functionality for polychoric correlation with imputed data at the date of this analysis (October/November 2025) (Van Buuren and Groothuis-Oudshoorn, 2011; Jorgensen, 2025). Acknowledging this limitation, the correlation analysis is continued on the basis of the point estimates.
@@ -99,7 +98,7 @@ First, the subset list of the imputed items of these factors has to be transform
 
 ```{r}
 mids_rel_cols <- datlist2mids(list_of_rel_cols)
-glimpse(mids_rel_cols)
+glimpse(mids_rel_cols[1])
 ```
 
 With this mids object, the ordinal CFA can be conducted in the following with the theory-founded model of four factors with at least three items: 
@@ -111,7 +110,7 @@ disclosure =~ DI01_01 + DI01_02 + DI01_03 + DI01_04
 usefulness =~ UI01_01 + UI01_02 + UI01_03 + UI01_04 
 explainability =~ EX01_01 + EX01_02 + EX01_03 + EX01_04 "
 
-ordinal_CFA1 <- cfa.mi(transparency, data=mids_rel_cols, estimator = "WLSMV", mimic = "MPlus", std.lv = TRUE, ordered = TRUE)
+ordinal_CFA1 <- lavaan.mi::cfa.mi(transparency, data=mids_rel_cols, estimator = "WLSMV", mimic = "MPlus", std.lv = TRUE, ordered = TRUE)
 ```
 
 <h2>Analysis of parameters and goodness-of-fit indices followed by model adjustments</h2>
@@ -122,11 +121,18 @@ The warnings already indicate that the covariance matrix is a non-positive defin
 summary(ordinal_CFA1, standardized = TRUE, fit.measures = TRUE)
 ```
 
-We analyze the absolute fit indices (chi-square, degrees of freedom (df), p-value, standardized root mean square (SRMS)), the parsimony correction index (root mean square error of approximation (RMSEA)), and the comparative fit indices (comparative fit index (CFI), Tucker-Lewis index (TLI)) to evaluate the null hypothesis. In addition, we inspect the residual correlations and modification indices where we also conduct a Wald test in order to inspect which items can be dropped. We conclude by interpreting the parameter estimates to finally shed a light on how the respecifyied model looks like. (Brown, 2015)
+```{r}
+fit_measures_ordinal_CFA1 <- fitMeasures(ordinal_CFA1, pool.method = "D2", fit.measures = c("chisq.scaling.factor", "chisq.scaled", "df", "df.scaled", "pvalue.scaled", "baseline.chisq.scaled", "baseline.df", "baseline.df.scaled", "baseline.pvalue.scaled", "srmr", "rmsea.robust", "rmsea.ci.lower.robust", "rmsea.ci.upper.robust", "rmsea.ci.level", "cfi.robust", "tli.robust"))
+
+df_fit_measures_ordinal_CFA1 <- as.data.frame(round(fit_measures_ordinal_CFA1, 4))
+df_fit_measures_ordinal_CFA1
+```
+
+We analyze the absolute fit indices (chi-square, degrees of freedom (df), p-value, standardized root mean square (SRMS)), the parsimony correction index (root mean square error of approximation (RMSEA)), and the comparative fit indices (comparative fit index (CFI), Tucker-Lewis index (TLI)) to evaluate the null hypothesis. In addition, we inspect the residual correlations and modification indices in order to inspect which items can be dropped. We conclude by interpreting the parameter estimates to finally shed a light on how the respecified model looks like. (Brown, 2015)
 
 First, we analyze the absolute fit indices. For the chi-square value, the scaled chi-square ("Test statistics", column "Scaled") is considered (Kline, 2016). The model specified achieves are rather bad scaled chi-square with ≈ 217.856 which is higher than the baseline model of ≈ 216.225 that rejects the null hypothesis (Brown, 2015). Moreover, the user model has 84 df whereas the baseline has 105 df, i.e., a broader freedom of estimates - even though the user model has less, it achieves a higher chi-square value (Brown, 2015). Both models have p-values < 0.05, i.e., reject the null hypothesis. As a consequence the model implied variance-covariance matrix does not fit the input matrix.
 
-Subsequently, the scaled SRMR of ≈ 0.175 indicates a rather high deviation between the correlations of the input and implied matrix whereas values close to 0.08 indicate an acceptable discrepancy (Brown, 2015). A perfect fit is achieved if SRMR = 0 (Brown, 2015). To further check on this, the residual correlations are inspected later on.
+Subsequently, the SRMR of ≈ 0.176 indicates a rather high deviation between the correlations of the input and implied matrix whereas values close to 0.08 indicate an acceptable discrepancy (Brown, 2015). A perfect fit is achieved if SRMR = 0 (Brown, 2015). To further check on this, the residual correlations are inspected later on.
 
 Commencing with the parsimony correction index for WLSMV, the robust RMSEA, that states ≈ 0.192 and thus, a model misspecification even in the lower confidence interval with ≈ 0.160. The model does not fit the chi-square value, i.e., the population. For a good fit the RMSEA value is suggested to be < 0.05. A perfect fit is achieved if RMSEA = 0. (Brown, 2015)
 
@@ -167,9 +173,8 @@ Due to multiple imputation, the relative increase in variance (riv) as well as t
 Solely, the combination of MIs and sepc.all values is essential for evaluation from this point of view, for the case that the suggested modification is considered in combination with all prior observations of this initial CFA.
 
 ```{r}
-mod_ind <- modificationIndices.mi(ordinal_CFA1, pool.method = c("D2"), standardized = TRUE, cov.std = TRUE, sort. = TRUE, minimum.value = "4")
+mod_ind <- lavaan.mi::modificationIndices.mi(ordinal_CFA1, pool.method = "D2", standardized = TRUE, cov.std = TRUE, sort. = TRUE, minimum.value = 4)
 mod_ind
-view(mod_ind)
 ```
 
 First, the potentially to-be reassigned items are introduced. The first three MIs ranging from ≈ 99.071 to ≈ 69.380 suggest a loading of UI01_04 on all three other dimensions. Although only the suggested modification of assigning UI01_04 to disclosure would be statistically meaningful due to the highest MI ≈ 99.071 despite the lowest sepc.all ≈ 0.979 as the sepc.all values are close to one another (≈ 1.001, ≈ 1.977) compared to the range of MIs (≈ 93.401, ≈ 69.380). The loading of UI01_01 to disclosure is also considered as it has an significant MI of ≈ 41.524 with an sepc.all of ≈ 0.579. Moreover, the loading of EX01_04 to disclosure has a MI of ≈ 7.294 and a rather bigger positive sepc.all of ≈ 1.516. Whereas the loading of EX01_04 on usefulness is not considered as the previous suggestion is stronger in terms of MI (≈ 7.294 > ≈ 5.644) and sepc.all (≈ 1.516 > ≈ 0.288).
@@ -280,7 +285,7 @@ disclosure =~ DI01_02 + DI01_03 + DI01_04 + EX01_04
 usefulness =~ UI01_01 + UI01_02
 explainability =~ EX01_02 + EX01_03 + UI01_04 "
 
-ordinal_CFA2 <- cfa.mi(transparency, data=mids_rel_cols, estimator = "WLSMV", mimic = "MPlus", std.lv = TRUE, ordered = TRUE)
+ordinal_CFA2 <- lavaan.mi::cfa.mi(transparency, data=mids_rel_cols, estimator = "WLSMV", mimic = "MPlus", std.lv = TRUE, ordered = TRUE)
 ```
 
 <h2>Analysis of parameters and goodness-of-fit indices</h2>
@@ -291,9 +296,17 @@ In contrast to the prior CFA, only one instead of ten warnings regarding non-pos
 summary(ordinal_CFA2, standardized = TRUE, fit.measures = TRUE)
 ```
 
-For the absolute fit indices, the changes of the scaled chi-square value have to be noted firstly as it has decreased from ≈ 217.856 to ≈ 90.564 significantly which already is a sign for an improved fit. The latter is underscored through the comparison of the scaled model chi-square value (≈ 90.564) and the scaled baseline model chi-square value which is considerably higher with ≈ 204.103. Further, the model has a lowered df = 48, whereas the baseline has df = 66. Even though the fit characteristics have improved at this point, the null hypothesis is rejected with a scaled p-value ≈ 0.000 despite the standard p-value ≈ 0.059 which would fail to reject the hypothesis.
+```{r}
+fit_measures_ordinal_CFA2 <- fitMeasures(ordinal_CFA2, pool.method = "D2", fit.measures = c("chisq.scaling.factor", "chisq.scaled", "df", "df.scaled", "pvalue.scaled", "baseline.chisq.scaled", "baseline.df", "baseline.df.scaled", "baseline.pvalue.scaled", "srmr", "rmsea.robust", "rmsea.ci.lower.robust", "rmsea.ci.upper.robust", "rmsea.ci.level", "cfi.robust", "tli.robust"))
 
-The scaled SRMR of ≈ 0.090 is closer to the benchmark of 0.08 than for the initial model with ≈ 0.175. As ordinal data on the basis of imputed data is inspected, we accept this value as approximately close to the benchmark moderate fit. To further check on this, the residual correlations are inspected later on.
+df_fit_measures_ordinal_CFA2 <- as.data.frame(round(fit_measures_ordinal_CFA2, 4))
+df_fit_measures_ordinal_CFA2
+```
+
+
+For the absolute fit indices, the changes of the scaled chi-square value have to be noted firstly as it has decreased from ≈ 217.856 to ≈ 90.564 significantly which already is a sign for an improved fit. The latter is underscored through the comparison of the scaled model chi-square value (≈ 90.564) and the scaled baseline model chi-square value which is considerably higher with ≈ 204.103. Further, the model has a lowered df = 48, whereas the baseline has df = 66. Even though the fit characteristics have improved at this point, the null hypothesis is rejected with a scaled p-value ≈ 0.0002.
+
+The SRMR of ≈ 0.0895 is closer to the benchmark of 0.08 than for the initial model with ≈ 0.175. As ordinal data on the basis of imputed data is inspected, we accept this value as approximately close to the benchmark moderate fit. To further check on this, the residual correlations are inspected later on.
 
 Similarly the robust RMSEA decreased from ≈ 0.192 to ≈ 0.136 with a 90 % lower confidence interval of ≈ 0.088 and an upper one of ≈ 0.181. Due to the ordinal and imputed attribute of the data as well as its small sample size for the WLSMV estimator (Brown, 2015), we suggest to accept this value as approximately close to the benchmark (especially for the lower confidence interval) as moderate fit.
 
@@ -315,9 +328,8 @@ z_res_va_cov_refit
 As only minor over- and underestimations are observed which are close to 0 and thus, do not exceed the value of |2.0|, the residual variance-covariance matrix does not suggest any improvements.
 
 ```{r}
-mod_ind_refit <- modificationIndices.mi(ordinal_CFA2, pool.method = c("D2"), standardized = TRUE, cov.std = TRUE, sort. = TRUE, minimum.value = "4")
+mod_ind_refit <- lavaan.mi::modificationIndices.mi(ordinal_CFA2, pool.method = "D2", standardized = TRUE, cov.std = TRUE, sort. = TRUE, minimum.value = 4)
 mod_ind_refit
-view(mod_ind_refit)
 ```
 
 The modification indices with a peak of ≈ 9.320 for the first row with only minor sepc.all values around 0, also suggest only minor room for improving the model's chi-square value.
@@ -346,16 +358,84 @@ transparency <-
 disclosure =~ DI01_02 + DI01_03 + DI01_04 + EX01_04
 explainability =~ EX01_02 + EX01_03 + UI01_04 "
 
-ordinal_CFA2_three_f <- cfa.mi(transparency, data=mids_rel_cols, estimator = "WLSMV", mimic = "MPlus", std.lv = TRUE, ordered = TRUE)
+ordinal_CFA2_three_f <- lavaan.mi::cfa.mi(transparency, data=mids_rel_cols, estimator = "WLSMV", mimic = "MPlus", std.lv = TRUE, ordered = TRUE)
 ```
 
 Initially a simple comparison is conducted on whether the chi-square value has improved. If no significant (p-value < 0.05) improvement can be inspected, the other fit indices are not inspected either as those all only show a different viewpoint on the chi-square value (Brown, 2015; Kline, 2016).
 
 ```{r}
-model_compare <- lavTestLRT.mi(ordinal_CFA2, ordinal_CFA2_three_f, pool.method = c("D2"), asymptotic = TRUE)
+model_compare <- lavaan.mi::lavTestLRT.mi(ordinal_CFA2, ordinal_CFA2_three_f, pool.method = c("D2"), asymptotic = TRUE)
 model_compare
 ```
 
 The alternative model of three factors does not show an significant improvement as Pr(>Chisq) which stands for the p-value ≈ 0.10189 and thus is larger than p = 0.05. The chi-square values only differ by ≈ 6.2086 for 3 df. Moreover, a slight increase of variance and FMI for the alternate model leads to a slightly increased uncertainty, e.g., in estimates.
 
 As a consequence the adjusted four factor model is used as a foundation for the following MANOVA analysis despite the at hand limitations of an only moderate model due to ordinal data and its imputation as well as the total rather small sample size.
+
+<h2>Final Reliability Check of the Four Factor Model</h2>
+Finally, the score reliability of the final model is evaluated as methods such as (M)ANOVA are based on a perfect reliability assumption (Brown, 2015). Score reliability refers to "the degree to which scores [...] are precise" (Kline, 2016, p. 90), i.e., the degree to which the sum of items actually measure the factor (Kline, 2016). In the following two reliability measures are calculated: Cronbach's alpha and the composite reliability measure omega (Kline, 2016; Jorgensen et al., 2025). Values close to 0 indicate that an dimensions score are likely random and thus, not measuring anything (Kline, 2016). The theoretical value range assumes values between 0-1 (Kline, 2016.
+
+Alpha and omega allow to measure if the factors actually measure what they aim to measure across the model (Kline, 2016). As Cronbach's alpha is often associated as "a misestimator of scale reliability" (Brown, 2015, p. 309), it is supported by omega which also takes the violation of tau equivalence (Brown, 2015), and the item response format of an ordinal scale (Carifio and Perla, 2007; Jorgensen et al., 2025) into account.
+
+```{r}
+df_for_reliability <- lapply(list_of_rel_cols, function(df){
+  df %>%
+    mutate(
+      across(all_of(relevant_columns), as.numeric)
+      )
+})
+
+ac_alpha_values <- lapply(df_for_reliability, function(df){
+  result <- alpha(subset(df[, c("AC01_01", "AC01_02", "AC01_03")]))
+  result$total$raw_alpha
+})
+ac_alpha_values_avg <- mean(unlist(ac_alpha_values))
+ac_alpha_values_avg
+
+di_alpha_values <- lapply(df_for_reliability, function(df){
+  result <- alpha(subset(df[, c("DI01_01", "DI01_02", "DI01_03", "EX01_04")]))
+  result$total$raw_alpha
+})
+di_alpha_values_avg <- mean(unlist(di_alpha_values))
+di_alpha_values_avg
+
+ui_alpha_values <- lapply(df_for_reliability, function(df){
+  result <- alpha(subset(df[, c("UI01_01", "UI01_02")]), check.keys = TRUE)
+  result$total$raw_alpha
+})
+ui_alpha_values_avg <- mean(unlist(ui_alpha_values))
+ui_alpha_values_avg
+
+ex_alpha_values <- lapply(df_for_reliability, function(df){
+  result <- alpha(subset(df[, c("EX01_02", "EX01_03", "UI01_04")]))
+  result$total$raw_alpha
+})
+ex_alpha_values_avg <- mean(unlist(ex_alpha_values))
+ex_alpha_values_avg
+
+```
+```{r}
+omega <- compRelSEM(ordinal_CFA2, tau.eq = FALSE, ord.scale = TRUE)
+omega
+```
+
+For accountability, a moderate alpha ≈ 0.63, omega ≈ 0.66 indicate a likely moderate reliability. In contrast, disclosure shows a high alpha ≈ 0.8419861, omega ≈ 0.951 which is likely to point to a too high similarity of items. However, as already discussed before, we still stay with this redefined dimension of disclosure due to the literatic distinction of items. For usefulness (alpha ≈ 0.70, omega ≈ 0.72) and explainability (alpha ≈ 0.71, omega ≈ 0.768) also a moderate reliability is assumed. Overall these values indicate that the at hand items of the redefined model precisely measure their respective dimensions which lays the foundation for further analysis. (Streiner, 2003).
+
+
+<h1>Save Results</h1>
+For an increased reproducibility, all CFAs are stored additionally.
+
+```{r}
+ordinal_CFA1_save <- save(ordinal_CFA1, file = "ordinal_CFA_storage/ordinal_CFA1.RData")
+
+ordinal_CFA2_save <- save(ordinal_CFA2, file = "ordinal_CFA_storage/ordinal_CFA2.RData")
+
+ordinal_CFA2_three_f_save <- save(ordinal_CFA2_three_f, file = "ordinal_CFA_storage/ordinal_CFA2_three_f.RData")
+```
+
+<h1>Latex Exports</h1>
+
+```{r}
+
+```
+
