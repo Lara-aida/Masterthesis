@@ -83,7 +83,19 @@ for (col_name in relevant_columns) {
 print(df_na)
 ```
 
-However, this fraction of values that are missing is only an initial starting point. First, we need to transform the items of each dimension into the data type factor. As factors allow us to assign the ordinal character to our data (GeeksforGeeks, 2025), which is required for multiple imputation to apply the correct imputation calculation, i.e., logistic regression (Rubin, 1987).
+What if all rows with at least one NA value are dropped?
+
+```{r}
+data_without_NA <- data_with_NA %>%
+  drop_na(all_of(relevant_columns))
+
+data_without_NA
+count(data_without_NA, TR01)
+```
+
+Only 57 records would remain for the scenario of deletion all -1 containing rows. This would result in a more severe unbalancedness of treatment groups as not even the rule of thumb of Bhattacherjee (2012) for medium effect size would have been met. Moreover, the doubled size of treatment 1 compared to treatment 4 would lead to misleading comparisons due to a lower variety of treatment 4.
+
+However, the fraction of values that are missing as well as the impact of their deletion are only an initial starting point justifying why multiple imputation is required. For multiple imputation, we need to transform the items of each dimension into the data type factor, first. As factors allow us to assign the ordinal character to our data (GeeksforGeeks, 2025), which is required for multiple imputation to apply the correct imputation calculation, i.e., logistic regression (Rubin, 1987).
 
 ```{r}
 data_with_fct <- data_with_NA %>%
@@ -250,6 +262,11 @@ write.csv(final_imputed_dataset, "data/mi_dataset.csv", row.names = FALSE)
 ```
 
 
+<h1>Latex Export</h1>
+
+```{r}
+xtable::xtable(df_na, type = "latex")
+```
 
 
 

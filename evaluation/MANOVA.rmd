@@ -35,6 +35,7 @@ library(biotools)
 library(car)
 library(effectsize)
 library(emmeans)
+library(pwr)
 ```
 
 <h1>Sample Load and Data Preparation</h1>
@@ -552,7 +553,7 @@ manova_model <- summary(manova_fit, test = c("Pillai"))
 manova_model
 ```
 
-For interpretation purposes, the F-statistic (column: "statistic") is pooled as a mipo object for all factor levels, i.e., CoT, RAG, and the interaction CoT:RAG and combined as an mira object in line with Van Buuren and Groothuis-Oudshoorn (2011):
+For interpretation purposes, the F-statistic (column: "statistic") of the fitted MANOVA model is pooled as a mipo object for all factor levels, i.e., CoT, RAG, and the interaction CoT:RAG and combined as an mira object in line with Van Buuren and Groothuis-Oudshoorn (2011):
 
 ```{r}
 # Extract all F-statistics for each level and combination, i.e., 10 F-statistic values for each treatment
@@ -564,6 +565,18 @@ manova_stats_CoTxRAG <- map_dbl(manova_fit$analyses, ~{tidy(.x)$statistic[3]})
 pooled_F_stats_CoT <- micombine.F(manova_stats_CoT, df = 10)
 pooled_F_stats_RAG <- micombine.F(manova_stats_RAG, df = 10)
 pooled_F_stats_CoTxRAG <- micombine.F(manova_stats_CoTxRAG, df = 10)
+```
+
+Moreover, the standardized effect size f2 to estimate the impact of an effect and the power of correctly rejecting H0 are necessary (Kaltenbach, 2021). Those values are calculated on the foundation of the pooled F-statistics. In line with Cohen (1988), based on the "F [...] and the [...] degrees of freedom" [p. 478], f2 can be calculated. This serves as a basis to calculate the power using a function of the 'pwr' package which takes f2 as an input (Champely, 2025).
+
+```{r}
+pooled_f2_CoT <- pooled_F_stats_CoT[1] * 10 / 678.41
+pooled_f2_RAG <- pooled_F_stats_RAG[1] * 10 / 9.65
+pooled_f2_CoTxRAG <- pooled_F_stats_CoTxRAG[1] * 10 / 113.54
+
+pooled_power_CoT <- pwr.f2.test(u = 10, v = 678.41, f2 = pooled_f2_CoT)
+pooled_power_RAG <- pwr.f2.test(u = 10, v = 9.65, f2 = pooled_f2_RAG)
+pooled_power_CoTxRAG <- pwr.f2.test(u = 10, v = 113.54, f2 = pooled_f2_CoTxRAG)
 ```
 
 For visualization and interpretation purposes, the values are depicted within a MANOVA-like table as follows:
@@ -585,17 +598,21 @@ pooled_manova <- bind_rows(bind_cols(pooled_manova_CoT, pooled_F_stats_CoT_df), 
 pooled_manova <- pooled_manova %>%
   rename(
     statistic = D
+  ) %>%
+  mutate(
+    f2 = c(pooled_f2_CoT, pooled_f2_RAG, pooled_f2_CoTxRAG),
+    power = c(pooled_power_CoT$power, pooled_power_RAG$power, pooled_power_CoTxRAG$power)
   )
 
 pooled_manova
 ```
 
-The pooled MANOVA results indicate soley significant main effects and no significant interaction effect according to a significance level alpha = 0.05. For CoT, a pooled F(10, 678) ≈ 1.8558, p ≈ 0.0483 indicates a significant main effect rejecting the H01b leading to the assumption that the CoT treatment has a multivariate effect on the dimensions of transparency. For RAG, a pooled F(10, 10) ≈ 23.6102, p < 0.0001 indicates a significant main effect rejecting the H01a leading to the assumption that the RAG treatment has an even stronger multivariate effect on the dimensions of transparency. As the interaction CoT:RAG with F(10, 114) ≈ 0.4336, p ≈ 0.9273 indicates no significant interaction effect, the test fails to reject H02. This indicates that it is likely that the CoT enhanced by RAG leads no synergy effects in improving transparency. 
+The pooled MANOVA results indicate soley significant main effects and no significant interaction effect according to a significance level alpha = 0.05. For CoT, a pooled F(10, 678) ≈ 1.8558, p ≈ 0.0483, f2 ≈ 0.0599, power ≈ 0.5688 indicates a significant main effect rejecting the H01b leading to the assumption that the CoT treatment has a multivariate effect on the dimensions of transparency. For RAG, a pooled F(10, 10) ≈ 23.6102, p < 0.0001, f2 ≈ 0.7616, power ≈ 1.0 indicates a significant main effect rejecting the H01a leading to the assumption that the RAG treatment has an even stronger multivariate effect on the dimensions of transparency. As the interaction CoT:RAG with F(10, 114) ≈ 0.4336, p ≈ 0.9273, f2 ≈ 0.0140, power ≈ 0.1533 indicates no significant interaction effect, the test fails to reject H02. This indicates that it is likely that the CoT enhanced by RAG leads no synergy effects in improving transparency. 
 
 The latter observation leads to a factorial ANOVA for each dependent variable, i.e., transparency dimension, in line with the workflow of Kang and Jin (2016).
 
 <h2>Factorial ANOVA</h2>
-The factorial ANOVAs are applied to all imputed data as with factorial MANOVA (Rubin, 1987; Van Buuren and Groothuis-Oudshoorn, 2011). Contrary to MANOVA, not only the F-statistics are pooled, but whole ANOVA’s are pooled using a built-capability of the miceadds package in R (Robitzsch, Grund and Henke, 2025). This allows to use the type II sum of squares method for the pooled ANOVA calculation (Robitzsch, Grund and Henke, 2025). The pooling also delivers the effect size measures (partial) eta squared based on the variance explained (r squared) (Robitzsch, Grund and Henke, 2025). Although, solely the partial eta squared metric is examined (Kaltenbach, 2021).
+The factorial ANOVAs are applied to all imputed data as with factorial MANOVA (Rubin, 1987; Van Buuren and Groothuis-Oudshoorn, 2011). Contrary to MANOVA, not only the F-statistics are pooled, but whole ANOVA’s are pooled using a built-capability of the miceadds package in R (Robitzsch, Grund and Henke, 2025). This allows to use the type II sum of squares method for the pooled ANOVA calculation (Robitzsch, Grund and Henke, 2025). The pooling also delivers the effect size measures (partial) eta squared based on the variance explained (r squared) (Robitzsch, Grund and Henke, 2025). Although, solely the partial eta squared metric is examined (Kaltenbach, 2021). The f2 and power statistics are provided for completion reasons (Kaltenbach, 2021).
 
 ```{r}
 # Listed ANOVAS across all imputed datasets
@@ -615,40 +632,93 @@ pooled_anova_fit_di <- mi.anova(mi.res = mids_coded, formula = "DI01_SCORE ~ CoT
 pooled_anova_fit_ui <- mi.anova(mi.res = mids_coded, formula = "UI01_SCORE ~ CoT * RAG", type = 2)
 pooled_anova_fit_ex <- mi.anova(mi.res = mids_coded, formula = "EX01_SCORE ~ CoT * RAG", type = 2)
 
-# R-squared values for each pooled ANOVA table
-print(pooled_anova_fit_ac$r.squared)
-print(pooled_anova_fit_di$r.squared)
-print(pooled_anova_fit_ui$r.squared)
-print(pooled_anova_fit_ex$r.squared)
+# Calculate f2
+pooled_anova_fit_ac_f2 <- pooled_anova_fit_ac$anova.table$partial.eta2 / (1 - pooled_anova_fit_ac$anova.table$partial.eta2)
+pooled_anova_fit_di_f2 <- pooled_anova_fit_di$anova.table$partial.eta2 / (1 - pooled_anova_fit_di$anova.table$partial.eta2)
+pooled_anova_fit_ui_f2 <- pooled_anova_fit_ui$anova.table$partial.eta2 / (1 - pooled_anova_fit_ui$anova.table$partial.eta2)
+pooled_anova_fit_ex_f2 <- pooled_anova_fit_ex$anova.table$partial.eta2 / (1 - pooled_anova_fit_ex$anova.table$partial.eta2)
+
+# Calculate power
+pooled_anova_fit_ac_power_CoT <- pwr.f2.test(u = 1, v = 10375.143, f2 = pooled_anova_fit_ac_f2[1])
+pooled_anova_fit_ac_power_RAG <- pwr.f2.test(u = 1, v = 3069.705, f2 = pooled_anova_fit_ac_f2[2])
+pooled_anova_fit_ac_power_CoTxRAG <- pwr.f2.test(u = 1, v = 1515.321, f2 = pooled_anova_fit_ac_f2[3])
+
+pooled_anova_fit_di_power_CoT <- pwr.f2.test(u = 1, v = 82497.16406, f2 = pooled_anova_fit_di_f2[1])
+pooled_anova_fit_di_power_RAG <- pwr.f2.test(u = 1, v = 59.12115, f2 = pooled_anova_fit_di_f2[2])
+pooled_anova_fit_di_power_CoTxRAG <- pwr.f2.test(u = 1, v = 17378.10167, f2 = pooled_anova_fit_di_f2[3])
+
+pooled_anova_fit_ui_power_CoT <- pwr.f2.test(u = 1, v = 146420.38, f2 = pooled_anova_fit_ui_f2[1])
+pooled_anova_fit_ui_power_RAG <- pwr.f2.test(u = 1, v = 67160.23, f2 = pooled_anova_fit_ui_f2[2])
+pooled_anova_fit_ui_power_CoTxRAG <- pwr.f2.test(u = 1, v = 188785.63, f2 = pooled_anova_fit_ui_f2[3])
+
+pooled_anova_fit_ex_power_CoT <- pwr.f2.test(u = 1, v = 15949.44, f2 = pooled_anova_fit_ex_f2[1])
+pooled_anova_fit_ex_power_RAG <- pwr.f2.test(u = 1, v = 32255.24, f2 = pooled_anova_fit_ex_f2[2])
+pooled_anova_fit_ex_power_CoTxRAG <- pwr.f2.test(u = 1, v = 28395.99, f2 = pooled_anova_fit_ex_f2[3])
 ```
 
 The factorial ANOVAs' results are stored within the following tables which serve as a foundation for the interpretation, respectively.
 
 ```{r}
 # Summary tables
+# Final table for accountability
 anova_ac <- data_frame(
   AC01 = c("CoT", "RAG", "CoT:RAG", "Residual")
 )
 anova_ac <- bind_cols(anova_ac, pooled_anova_fit_ac)
-anova_ac <- anova_ac[, c(1, 3, 4, 5, 6, 7, 2, 8, 9, 10)]
+anova_ac <- anova_ac %>%
+  mutate(
+    f2 = c(pooled_anova_fit_ac_f2[1], pooled_anova_fit_ac_f2[2], pooled_anova_fit_ac_f2[3], 0),
+    power = c(pooled_anova_fit_ac_power_CoT$power, pooled_anova_fit_ac_power_RAG$power, pooled_anova_fit_ac_power_CoTxRAG$power, 0)
+  ) %>%
+  mutate(
+    across(where(is.numeric), ~ round(.x, 4))
+  )
+anova_ac <- anova_ac[, c(1, 3, 4, 5, 6, 7, 2, 8, 9, 11, 12, 10)]
 
+# Final table for disclosure
 anova_di <- data_frame(
   DI01 = c("CoT", "RAG", "CoT:RAG", "Residual")
 )
 anova_di <- bind_cols(anova_di, pooled_anova_fit_di)
-anova_di <- anova_di[, c(1, 3, 4, 5, 6, 7, 2, 8, 9, 10)]
+anova_di <- anova_di %>%
+  mutate(
+    f2 = c(pooled_anova_fit_di_f2[1], pooled_anova_fit_di_f2[2], pooled_anova_fit_di_f2[3], 0),
+    power = c(pooled_anova_fit_di_power_CoT$power, pooled_anova_fit_di_power_RAG$power, pooled_anova_fit_di_power_CoTxRAG$power, 0)
+  ) %>%
+  mutate(
+    across(where(is.numeric), ~ round(.x, 4))
+  )
+anova_di <- anova_di[, c(1, 3, 4, 5, 6, 7, 2, 8, 9, 11, 12, 10)]
 
+# Final table for usefulness of information
 anova_ui <- data_frame(
   UI01 = c("CoT", "RAG", "CoT:RAG", "Residual")
 )
 anova_ui <- bind_cols(anova_ui, pooled_anova_fit_ui)
-anova_ui <- anova_ui[, c(1, 3, 4, 5, 6, 7, 2, 8, 9, 10)]
+anova_ui <- anova_ui %>%
+  mutate(
+    f2 = c(pooled_anova_fit_ui_f2[1], pooled_anova_fit_ui_f2[2], pooled_anova_fit_ui_f2[3], 0),
+    power = c(pooled_anova_fit_ui_power_CoT$power, pooled_anova_fit_ui_power_RAG$power, pooled_anova_fit_ui_power_CoTxRAG$power, 0)
+  ) %>%
+  mutate(
+    across(where(is.numeric), ~ round(.x, 4))
+  )
+anova_ui <- anova_ui[, c(1, 3, 4, 5, 6, 7, 2, 8, 9, 11, 12, 10)]
 
+# Final table for explainability
 anova_ex <- data_frame(
   EX01 = c("CoT", "RAG", "CoT:RAG", "Residual")
 )
 anova_ex <- bind_cols(anova_ex, pooled_anova_fit_ex)
-anova_ex <- anova_ex[, c(1, 3, 4, 5, 6, 7, 2, 8, 9, 10)]
+anova_ex <- anova_ex %>%
+  mutate(
+    f2 = c(pooled_anova_fit_ex_f2[1], pooled_anova_fit_ex_f2[2], pooled_anova_fit_ex_f2[3], 0),
+    power = c(pooled_anova_fit_ex_power_CoT$power, pooled_anova_fit_ex_power_RAG$power, pooled_anova_fit_ex_power_CoTxRAG$power, 0)
+  ) %>%
+  mutate(
+    across(where(is.numeric), ~ round(.x, 4))
+  )
+anova_ex <- anova_ex[, c(1, 3, 4, 5, 6, 7, 2, 8, 9, 11, 12, 10)]
 
 anova_ac
 anova_di
@@ -656,17 +726,17 @@ anova_ui
 anova_ex
 ```
 
-For the dependent variable of accountability (AC01_SCORE), only the main effect of CoT is likely to be significant with F(1, 10375) ≈ 4.7799, p ≈ 0.0288, partial.eta2 ≈ 0.03768. This indicates that the CoT treatment is likely to influence the accountability dimension of transparency with a different mean compared to the other groups. Although, the low partial.eta2 value of ≈ 3.8 % points to a low impact of the treatment's characteristics on the overall variation of the dimension. The high sum of squared errors for the residual indicates only slight differences among treatment groups.
+For the dependent variable of accountability (AC01_SCORE), only the main effect of CoT is likely to be significant with F(1, 10375) ≈ 4.7799, p ≈ 0.0288, partial.eta2 ≈ 0.03768, f2 ≈ 0.0391, power ≈ 1.0. This indicates that the CoT treatment is likely to influence the accountability dimension of transparency with a different mean compared to the other groups. Although, the low partial.eta2 value of ≈ 3.8 % points to a low impact of the treatment's characteristics on the overall variation of the dimension. The high sum of squared errors for the residual indicates only slight differences among treatment groups.
 
-For the dependent variable of disclosure (DI01_SCORE), only the main effect of RAG is likely to be significant with F(1, 59) ≈ 164.7453, p < 0.0001, partial.eta2 ≈ 0.679621. These metrics indicate that the mean value of RAG varies significantly compared to the other treatments. Moreover, the RAG treatment can be expected to influence the dimension of disclosure heavily which is underpinned by relatively high partial.eta2 value that indicates that in ≈ 68.0 % the overall variation of the dimension is impacted by RAG.
+For the dependent variable of disclosure (DI01_SCORE), only the main effect of RAG is likely to be significant with F(1, 59) ≈ 164.7453, p < 0.0001, partial.eta2 ≈ 0.6797, f2 ≈ 0.0002, power ≈ 0.9950. These metrics indicate that the mean value of RAG varies significantly compared to the other treatments. Moreover, the RAG treatment can be expected to influence the dimension of disclosure heavily which is underpinned by relatively high partial.eta2 value that indicates that in ≈ 68.0 % the overall variation of the dimension is impacted by RAG.
 
-For the dependent variable of usefulness of information (UI01_SCORE) no significant effect is detected. However, as the residual sum of squarred errors is higher than for each effect the variation of this dimension remains unexplained and for this dimension there are no differences that can be appointed towards any treatment group (Kaltenbach, 2021).
+For the dependent variable of usefulness of information (UI01_SCORE) no significant effect is detected. However, as the residual sum of squared errors is higher than for each effect the variation of this dimension remains unexplained and for this dimension there are no differences that can be appointed towards any treatment group (Kaltenbach, 2021).
 
-For the dependent variable of explainability (EX01_SCORE), RAG reveals likely to be the only significant main effect again with F(1, 32255) ≈ 13.6770, p ≈ 0.0002, partial.eta2 ≈ 0.0989. This indicates a different mean for RAG and an impact of ≈ 9.9 % according to partial.eta2 on this dimension's variation. The high sum of squared errors for the residual indicates only slight differences among treatment groups.
+For the dependent variable of explainability (EX01_SCORE), RAG reveals likely to be the only significant main effect again with F(1, 32255) ≈ 13.6770, p ≈ 0.0002, partial.eta2 ≈ 0.0979, f2 ≈ 0.1097, power ≈ 1.0. This indicates a different mean for RAG and an impact of ≈ 9.8 % according to partial.eta2 on this dimension's variation. The high sum of squared errors for the residual indicates only slight differences among treatment groups.
 
 As the main effects repeatedly proved likely to be responsible for the differences in variations of each dependent variable except for usefulness of information (UI01_SCORE), a post-hoc analysis of main effect contrasts is conducted.
 
-<h3>Post-Hoc Main Effect Contrasts</h3>
+<h3>Post-Hoc Contrasts: Pair-wise Comparison of Treatments</h3>
 To verify the prior results, a post-hoc main effect contrast analysis is conducted. In contrast to the beforehand analysis, the linear contrasts analysis provides a detailed view on how the main effects differ. The foundation for contrast analysis is set through the calculation of estimated marginal means. (Kaltenbach, 2021)
 
 In line with Kaltenbach (2021) the full model for each dimension: "AC01_SCORE | DI01_SCORE | UI01_SCORE | EX01_SCORE ~ CoT + RAG + CoT * RAG" is used to calculate respective estimated marginal means. Moreover, the prior set coding is reused again for the the calculations. Due to the unbalanced setting, Kang and Jin (2016) suggest to use the method by Sidak to adjust respective confidence intervals.
@@ -704,7 +774,10 @@ Only the already after the prior analysis likely effects are examined. Except fo
 contrasts_examined <- list(
   "Vanilla vs. CoT" = c(1, -1, 0, 0),
   "Vanilla vs. RAG" = c(1, 0, -1, 0),
-  "CoT (Inference) vs. RAG (Post-Training)" = c(0, 1, -1, 0)
+  "Vanilla vs. RAGxCoT" = c(1, 0, 0, -1),
+  "CoT vs. RAGxCoT" = c(0, 1, 0, -1),
+  "CoT vs. RAG" = c(0, 1, -1, 0),
+  "RAG vs. RAGxCoT" = c(0, 0, 1, -1)
 )
 
 # Calculate main effect contrasts
@@ -738,13 +811,17 @@ main_effect_contrasts_ui_res
 main_effect_contrasts_ex_res
 ```
 
-For the accountability dimension (AC01_SCORE), the main effect of CoT is examined. The post-hoc analysis for accountability reveals no significant differences between Vanilla and CoT, p ≈ 0.6077 (mean_diff ≈ 0.1680, 95%-CI[-0.248, 0.585]) and between CoT and RAG, p ≈ 0.4112 (mean_diff ≈ -0.2374, 95%-CI[-0.677, 0.202]). Consequently, the assumption of likely significant CoT main effect for accountability is withdrawn due to a likely non-significance revealed through contrast analysis despite a likely rejection of the null hypothesis.
+For the accountability dimension (AC01_SCORE), the main effect of CoT is examined. The post-hoc analysis for accountability reveals no significant differences between Vanilla and CoT, p ≈ 0.6077 (mean_diff ≈ 0.1680, 95%-CI[-0.248, 0.585]) and between CoT and RAG, p ≈ 0.4112 (mean_diff ≈ -0.2374, 95%-CI[-0.677, 0.202]). This is further verified by only a minor difference between CoT and RAGxCoT p ≈ 0.7945 (mean_diff ≈ 0.1898, 95%-CI[-0.342, 0.722]). Consequently, the assumption of likely significant CoT main effect for accountability is withdrawn due to a likely non-significance revealed through contrast analysis despite a likely rejection of the null hypothesis. Moreover, for the whole dimension of accountability it can be observed that none of the pair-wise mean comparisons shows a significant difference as all have p-values > 0.05.
 
-However, the main effect of RAG for the dimension of disclosure (DI01_SCORE) is likely to be verified by contrast analysis. This is due to a significant difference between Vanilla and RAG, p < 0.0001 (mean_diff ≈ -2.498, 95%-CI[-3.045, -1.951]) and between CoT and RAG, p < 0.0001 (mean_diff ≈ -2.382, 95%-CI[-2.907, -1.857]). Those values indicate that the estimated mean differs ≈ 2 ratings between RAG and the other two treatment groups within the upper CI even around 3 points. It has to be noted that the higher SEs of disclosure compared to the SEs of accountability and usefulness of information lead to increased CIs. Nevertheless, and underpinned by the prior descriptive analysis, the main effect of RAG is verified to be likely significant. Consequently, the null hypothesis is rejected.
+However, the main effect of RAG for the dimension of disclosure (DI01_SCORE) is likely to be verified by contrast analysis. This is due to a significant difference between Vanilla and RAG, p < 0.0001 (mean_diff ≈ -2.498, 95%-CI[-3.045, -1.951]) and between CoT and RAG, p < 0.0001 (mean_diff ≈ -2.382, 95%-CI[-2.907, -1.857]). Those values indicate that the estimated mean differs ≈ 2 ratings between RAG and the other two treatment groups within the lower CI even around 3 points. It has to be noted that the higher SEs of disclosure compared to the SEs of accountability and usefulness of information lead to increased CIs. Nevertheless, and underpinned by the prior descriptive analysis, the main effect of RAG is verified to be likely significant. Consequently, the null hypothesis is rejected.
+
+Moreover, the difference between RAG and RAGxCoT can be neglected as assumed before with the statement that no significant interaction effect is observed. This is due to only a slightly negative, non-significant difference of RAG to RAGxCoT, p ≈ 0.9856 (mean_diff ≈ -0.0889, 95%-CI[-0.746, 0.568]) which indicates that RAGxCoT might only achieve a minor improved rating than RAG as a standalone. This mainly by RAG caused effect is also verified by the difference between CoT and RAGxCoT, p <.0001 (mean_diff ≈ -2.4708, 95%-CI[-3.091, -1.851]). Those values indicate that the estimated mean differs ≈ 2 ratings between RAGxCoT and CoT within the lower CI even around 3 points which is in line with RAG standalone compared to Vanilla and CoT each.
 
 For usefulness of information (UI01_SCORE), the non-significance of all treatment groups is likely to be assumed. An example for this is the non-significant difference between Vanilla and CoT, p ≈ 0.9925 (mean_diff ≈ -0.0171, 95%-CI[-0.362, 0.328]). Nevertheless, the null hypothesis is rejected.
 
 For the explainability dimension (EX01_SCORE), the significance assumption of RAG is likely to be declined on the basis of the contrast analysis' results. The post-hoc analysis for explainability shows no significant differences between Vanilla and RAG, p ≈ 0.1673 (mean_diff ≈ -0.4740, 95%-CI[-1.091, 0.143]) and between CoT and RAG, p ≈ 0.1251 (mean_diff ≈ -0.5061, 95%-CI[-1.116, 0.104]). The highest SEs compared to the other dependent variables' SEs lead to broad CIs that might indicate potential significant differences, e.g., differences of 1 rating point for RAG compared to other treatment groups. Due to the high SEs these CI values can be neglected. The previously as likely recognized significant effect of RAG on the dimension of explainability is likely to be non-significant. The null hypothesis is rejected.
+
+However, a likely significant difference between Vanilla and RAGxCoT, p ≈ 0.0233 (mean_diff ≈ -0.8012, 95%-CI[-1.525, -0.0773]), and CoT and RAGxCoT, p ≈ 0.0145 (mean_diff ≈ -0.8334, 95%-CI[-1.547, -0.1198]), is observed. This indicates that RAGxCoT achieves 0, 1 (mostly as it is the mean estimated difference) or even 2 rating points higher ratings for explainability than Vanilla and CoT each. As the difference between RAG and RAGxCoT is not significant, no full interaction effect can be assumed which is in line with prior observations. Although a partial interaction effect might be likely present due to the significant differences outlined. If so, we must reflect on the low SSQ of the interaction compared to the residual SSQ which explains that most of the effects is due to a measurement error and not due to the variation. This is underlined by the effect size partial.eta2 which indicates that the rating given is only due to RAGxCoT in 0.83 % of observations.
 
 To conclude after all observations, only the main effect of RAG for the dependent variable of disclosure (DI01_SCORE) showed a moderate likelihood of significance. Whereas main effects that were perceived likely significant after factorial ANOVA are more likely to be non-significant, i.e., main effect of CoT on accountability and main effect of RAG on explainability. For the dependent variable of usefulness of information no significant effects seemed to be prevalent which refers to negligible differences between each treatments' effects. 
 
@@ -779,8 +856,103 @@ main_effect_contrasts_ex_res_save <- save(main_effect_contrasts_ex_res, file = "
 
 <h1>Latex Exports</h1>
 
-```{r}
+Descriptive Statistic:
 
+```{r}
+ggsave("latex_exports/boxplot_sum.png", plot = sum_of_all)
 ```
+
+
+```{r}
+metrics <- descriptive_stats %>%
+  pivot_longer(
+    cols = c(N, mean, lower_CI, upper_CI, SE, median, mode, SD, variance, minimum, maximum),
+    names_to = "metric",
+    values_to = "value"
+  )
+
+decriptive_table <- metrics %>%
+  select(metric, treatment, dependent_variable, value) %>%
+  pivot_wider(
+    id_cols = c(metric, treatment),
+    names_from = dependent_variable,
+    values_from = value
+  ) %>%
+  arrange(metric, treatment)
+
+decriptive_table
+
+xtable::xtable(decriptive_table, type = "latex") 
+```
+
+MANOVA:
+```{r}
+xtable::xtable(manova_model, type = "latex") 
+```
+
+```{r}
+xtable::xtable(pooled_manova, type = "latex") 
+```
+
+
+Factorial ANOVAs:
+```{r}
+anova_list_ac <- as.data.frame(summary(anova_fit_list_ac))
+anova_list_ac
+xtable::xtable(anova_list_ac, type = "latex") 
+```
+
+```{r}
+anova_list_di <- as.data.frame(summary(anova_fit_list_di))
+anova_list_di
+xtable::xtable(anova_list_di, type = "latex") 
+```
+
+```{r}
+anova_list_ui <- as.data.frame(summary(anova_fit_list_ui))
+anova_list_ui
+xtable::xtable(anova_list_ui, type = "latex") 
+```
+
+```{r}
+anova_list_ex <- as.data.frame(summary(anova_fit_list_ex))
+anova_list_ex
+xtable::xtable(anova_list_ex, type = "latex")
+```
+
+```{r}
+xtable::xtable(anova_ac, type = "latex")
+```
+
+```{r}
+xtable::xtable(anova_di, type = "latex")
+```
+
+```{r}
+xtable::xtable(anova_ui, type = "latex")
+```
+
+```{r}
+xtable::xtable(anova_ex, type = "latex")
+```
+
+Contrast analysis:
+```{r}
+xtable::xtable(main_effect_contrasts_ac_res, type = "latex") 
+```
+
+```{r}
+xtable::xtable(main_effect_contrasts_di_res, type = "latex") 
+```
+
+```{r}
+xtable::xtable(main_effect_contrasts_ui_res, type = "latex") 
+```
+
+```{r}
+xtable::xtable(main_effect_contrasts_ex_res, type = "latex") 
+```
+
+
 
 

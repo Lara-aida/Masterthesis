@@ -75,7 +75,9 @@ dimnames(p_cor_pooled) <- list(
   Cols=relevant_columns
   )
 
+png("latex_exports/polychoric_corr.png", width = 750, height = 750, res = 100)
 corrplot(p_cor_pooled, method = 'circle', type = 'lower', insig='blank', addCoef.col ='black', number.cex = 0.9, tl.col = 'black', tl.cex = 0.9)
+dev.off()
 ```
 
 At a first glance, the correlations between DI01_03 and DI01_02, EX01_04 and DI01_02 as well as EX01_04 and DI01_03 are close to + 1 indicating a monotonic, positive relationship. This indicates that if one of the items in the relationship has a high rating (close to 5), the other one has a high rating, too. This points to a lack of discriminant validity due to a potential multicollinearity as those factor correlations exceed 0.85 (Brown, 2015). As the latter ordinal CFA necessitates discriminant factors that are parsimonous (Brown, 2015), these correlations must be acknowledged later on.
@@ -436,6 +438,36 @@ ordinal_CFA2_three_f_save <- save(ordinal_CFA2_three_f, file = "ordinal_CFA_stor
 <h1>Latex Exports</h1>
 
 ```{r}
+final_items = c("AC01_01", "AC01_02", "AC01_03", "DI01_02", "DI01_03", "DI01_04", "EX01_04", "UI01_01", "UI01_02", "EX01_02", "EX01_03", "UI01_04")
 
+ordinal_CFA2_loadings <- round(est_refit$est[1:12], 4)
+
+accountability <- rep("-", 12)
+disclosure     <- rep("-", 12)
+usefulness     <- rep("-", 12)
+explainability <- rep("-", 12)
+
+accountability[1:3] <- ordinal_CFA2_loadings[1:3]
+disclosure[4:7] <- ordinal_CFA2_loadings[4:7]
+usefulness[8:9] <- ordinal_CFA2_loadings[8:9]
+explainability[10:12] <- ordinal_CFA2_loadings[10:12]
+
+measurement_model_loadings_reliability <- data_frame(
+  items = final_items,
+  accountability = accountability,
+  disclosure = disclosure,
+  usefulness = usefulness,
+  explainability = explainability
+  )
+
+measurement_model_loadings_reliability <- rbind(measurement_model_loadings_reliability, c("Cronbach's", round(ac_alpha_values_avg, 4), round(di_alpha_values_avg, 4), round(ui_alpha_values_avg, 4), round(ex_alpha_values_avg, 4)))
+
+measurement_model_loadings_reliability <- rbind(measurement_model_loadings_reliability, c("Composite Reliability", round(omega, 4)))
+
+measurement_model_loadings_reliability
+```
+
+```{r}
+xtable::xtable(measurement_model_loadings_reliability, type = "latex") 
 ```
 
