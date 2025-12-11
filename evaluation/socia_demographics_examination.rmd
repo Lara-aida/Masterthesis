@@ -13,14 +13,12 @@ library(ggplot2)
 library(dplyr)
 ```
 
-
 <h1>Sample Description: Socio Demographics</h1>
 First, the final sample is loaded:
 
 ```{r}
 getwd()
 raw_data <- readxl::read_excel("data/raw_data.xlsx", sheet = 2)
-view(raw_data)
 glimpse(raw_data)
 ```
 
@@ -51,8 +49,7 @@ sex <- socio_demographics %>%
   mutate(relative_share_percent = round(100 * absolute_count / sum(absolute_count), 0)
   )
 
-glimpse(sex)
-  
+sex
 ```
 
 The results show the following distribution:
@@ -69,8 +66,6 @@ age <- socio_demographics %>%
   mutate(age_group_years = factor(age_group_years, labels = age_group_labels))
 
 ggplot(data = age, aes(x=age_group_years)) + geom_bar(fill=rgb(0.1,0.4,0.5,1))
-
-glimpse(age)
 ```
 
 The following shows the age group distribution in percentage:
@@ -86,7 +81,7 @@ age <- socio_demographics %>%
   ) %>%
   mutate(relative_share_percent= round(100 * absolute_count / sum(absolute_count), 2))
 
-view(age)
+print.data.frame(age)
 ```
 
 The results display that the age groups are widely spread with an high concentration on the group of 19-24 yr olds (39, 29.77 %) followed by the group of 25-29 yr olds (20, 15.27 %) and on a third place, the 50-54 yr olds (15, 11.45 %). However, all age groups spanning from <18 yrs until >65 yrs have at least one representative.
@@ -102,8 +97,6 @@ degree <- socio_demographics %>%
 
 ggplot(data = degree, aes(x=degree)) + geom_bar(fill=rgb(0.1,0.4,0.5,1)) + 
 coord_flip()
-
-glimpse(degree)
 ```
 
 The following shows the degree distribution in percentage:
@@ -125,7 +118,7 @@ degree <- socio_demographics %>%
   ) %>%
   mutate(relative_share_percent = round(100 * absolute_count / sum(absolute_count), 2))
 
-view(degree)
+print.data.frame(degree)
 ```
 
 In terms of educational degrees, higher educational degrees dominate, i.e., Bachelor’s (36, 27.48 %), Master’s (27, 20.61 %), and Diploma in a third place (26, 19.85 %). Moreover, almost all degrees are represented, except of the category of having no-degree. Three participants even selected the option “Else” stating that they have a “Staatsexamen” or a non-German degree.
@@ -140,8 +133,6 @@ employment <- socio_demographics %>%
   mutate(employment = factor(employment, labels = employment_labels)) 
 
 ggplot(data = employment, aes(x=employment)) + geom_bar(fill=rgb(0.1,0.4,0.5,1)) + coord_flip()
-  
-view(employment)
 ```
 
 The following shows the employment distribution in percentage:
@@ -157,7 +148,7 @@ employment <- socio_demographics %>%
   ) %>%
   mutate(relative_share_percent= round(100 * absolute_count / sum(absolute_count), 2))
 
-view(employment)
+employment
 ```
 	
 When it comes to the employment status, a massive share of 105 participants (80.15 %) are employees. Whereas other groups are rather barely represented, except for students which state 11 participants (8.40 %).
