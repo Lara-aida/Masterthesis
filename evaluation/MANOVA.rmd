@@ -136,7 +136,7 @@ ac01_plot <- lapply(analysis_list_factor_mean_cols, function(df) {
   ggplot(df, aes(treatment, AC01_SCORE, color=treatment)) + geom_boxplot() + stat_boxplot(geom='errorbar',coef=5) + geom_jitter(width = 0.2) + ylim(1, 5)
 })
 
-ac01_plot
+ac01_plot[1]
 ```
 
 ```{r}
@@ -144,7 +144,7 @@ di01_plot <- lapply(analysis_list_factor_mean_cols, function(df) {
   ggplot(df, aes(treatment, DI01_SCORE, color=treatment)) + geom_boxplot() + stat_boxplot(geom='errorbar',coef=5) + geom_jitter(width = 0.2) + ylim(1, 5)
 })
 
-di01_plot
+di01_plot[1]
 ```
 
 ```{r}
@@ -152,7 +152,7 @@ ui01_plot <- lapply(analysis_list_factor_mean_cols, function(df) {
   ggplot(df, aes(treatment, UI01_SCORE, color=treatment)) + geom_boxplot() + stat_boxplot(geom='errorbar',coef=5) + geom_jitter(width = 0.2) + ylim(1, 5)
 })
 
-ui01_plot
+ui01_plot[1]
 ```
 
 ```{r}
@@ -160,7 +160,7 @@ ex01_plot <- lapply(analysis_list_factor_mean_cols, function(df) {
   ggplot(df, aes(treatment, EX01_SCORE, color=treatment)) + geom_boxplot() + stat_boxplot(geom='errorbar',coef=5) + geom_jitter(width = 0.2) + ylim(1, 5)
 })
 
-ex01_plot
+ex01_plot[1]
 ```
 
 ```{r fig.width=10, fig.height=6}
@@ -181,13 +181,13 @@ sum_of_all
 
 As the questionnaire only allows to answer on a Likert scale 1-5 ordinal response format with 1 indicating the highest disagreement and 5 in reverse, the medians and values interpreted below are rounded, i.e., 2.5 ≈ 3.
 
-For the dependent variable of accountability (AC01_SCORE), a common median of 4 is observed. This indicates that all treatments are likely to achieve a high accountability from a user point of view, i.e., all treatments interact with the user in a rather neutral, believing, and rule-accompanying way. However, for CoT and CoTxRAG the minimum value significantly disagrees referring to a tiny share of users do not agree to the median at all. For all four treatments, the values are concentrated around 4 (3 - 5) - which overall agress with the median.
+For the dependent variable of accountability (AC01_SCORE), a common median of 4 is observed. This indicates that all treatments are likely to achieve a high accountability from a user point of view, i.e., all treatments interact with the user in a rather neutral, believing, and rule-accompanying way. However, for CoT and CoTxRAG the minimum value significantly disagrees referring to a tiny share of users do not agree to the median at all. For all four treatments, the values are concentrated around 4 (3 - 5) - which overall agrees with the median.
 
-The second dependent variable, disclosure (DI01_SCORE), varies broadly compared to the prior outlined variable as the median of RAG and CoTxRAG is 4 whereas Vanilla's and CoT's median is 1. Accordingly, RAG-based treatments are more likely to be perceived as disclosing sources and additional content than Vanilla or CoT treatments. However, a maximum value of 5 for the latter both indicate that it is not unlikely at all that those two treatments are perceived disclosing, too. In contrast, RAG's and CoTxRAG's minimum values are 2 and 3 indicating that users are very likely to perceive those treatments at least a bit disclosing. To conclude, the values for Vanilla and CoT are less dispersed than the values for RAG and CoTxRAG referring a higher agreement among respondents of the latter two treatments.
+The second dependent variable, disclosure (DI01_SCORE), varies broadly compared to the prior outlined variable as the median of RAG and CoTxRAG is 4 whereas Vanilla's and CoT's median is 1. Accordingly, RAG-based treatments are more likely to be perceived as disclosing sources and additional content than Vanilla or CoT treatments. However, a maximum value of 5 for the latter both indicate that it is not unlikely at all that those two treatments are perceived disclosing, too. In contrast, RAG's and CoTxRAG's minimum values are 2 and 3 indicating that users are very likely to perceive those treatments at least a bit disclosing. To conclude, the values for Vanilla and CoT are more dispersed than the values for RAG and CoTxRAG referring a higher agreement among respondents of the latter two treatments.
 
 Usefulness of information (UI01_SCORE) as the third dependent variable, achieves a higher agreement across all four treatments with a median of 5 and a similar dispersion of values of 3 - 5. Consequently, all users are likely to agree that all treatment's lead to useful information that contains the most important points of a user's request in an understandable way.
 
-Finally, the tendency of the last dependent variable of explainability (EX01_SCORE) is conducted. Here again more varying medians are observed as all treatments have a median of 2 except for CoTxRAG which inherits a median of 3. Similar to disclosure that values are spread across all possible values 1 - 5. Although the maximum value of CoT which is 4 indicates that CoT is more likely to be perceived less explainable than the others, i.e., allowing to trace its argumentation and to react on the user's demands. In contrast to the others, CoTx RAG is more spread around 3 which explains its higher median. Consequently, it is more likely to be perceived more explainable than the other treatments. It has to be nouned that a value of 3 indicates neither a high nor a low explainability. Thereby, even though CoTxRAG is more likely to have a higher explainablility than the other treatments, it is likely to be only moderately explainable in the end.
+Finally, the tendency of the last dependent variable of explainability (EX01_SCORE) is conducted. Here again more varying medians are observed as all treatments have a median of 2 except for CoTxRAG which inherits a median of 3. Similar to disclosure that values are spread across all possible values 1 - 5. Although the maximum value of CoT which is 4 indicates that CoT is more likely to be perceived less explainable than the others, i.e., allowing to trace its argumentation and to react on the user's demands. In contrast to the others, CoTx RAG is more spread around 3 which explains its higher median. Consequently, it is more likely to be perceived more explainable than the other treatments. It has to be nouned that a value of 3 indicates neither a high nor a low explainability. Thereby, even though CoTxRAG is more likely to have a higher explainability than the other treatments, it is likely to be only moderately explainable in the end.
 
 
 
@@ -488,7 +488,6 @@ shapiro_wilk_test_avg <- shapiro_stacked %>%
       .groups = "drop"
     )
 
-shapiro_wilk_test_list
 shapiro_wilk_test_avg
 ```
 

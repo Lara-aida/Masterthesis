@@ -24,11 +24,10 @@ First, the final sample is loaded:
 ```{r}
 getwd()
 raw_data <- readxl::read_excel("data/raw_data.xlsx", sheet = 2)
-view(raw_data)
 glimpse(raw_data)
 ```
 
-As discussed within the thesis, the -1 values need to be replaced by plausible values for multiple imputation.  However, they need to be turned into NA values first.
+As discussed within the thesis, the -1 values need to be replaced by plausible values for multiple imputation. However, they need to be turned into NA values first.
 
 ```{r}
 relevant_columns <- c("AC01_01", "AC01_02", "AC01_03", "DI01_01", "DI01_02", "DI01_03", "DI01_04", "UI01_01", "UI01_02", "UI01_03", "UI01_04", "EX01_01", "EX01_02", "EX01_03", "EX01_04")
@@ -54,7 +53,7 @@ sum_of_NA <- sum(is.na.data.frame(data_with_NA))
 
 # Count the amount of answers for the relevant_columns
 relevant_records <- data_with_NA[, relevant_columns]
-print(relevant_records)
+#print(relevant_records)
 total_relevant_cells <- nrow(relevant_records) * ncol(relevant_records)
 
 print(paste("Amount of all cells with NA values: ", sum_of_NA))
@@ -80,7 +79,7 @@ for (col_name in relevant_columns) {
   ))
 }
 
-print(df_na)
+print.data.frame(df_na)
 ```
 
 What if all rows with at least one NA value are dropped?
@@ -89,8 +88,7 @@ What if all rows with at least one NA value are dropped?
 data_without_NA <- data_with_NA %>%
   drop_na(all_of(relevant_columns))
 
-data_without_NA
-count(data_without_NA, TR01)
+print.data.frame(count(data_without_NA, TR01))
 ```
 
 Only 57 records would remain for the scenario of deletion all -1 containing rows. This would result in a more severe unbalancedness of treatment groups as not even the rule of thumb of Bhattacherjee (2012) for medium effect size would have been met. Moreover, the doubled size of treatment 1 compared to treatment 4 would lead to misleading comparisons due to a lower variety of treatment 4.
@@ -268,16 +266,8 @@ write.csv(final_imputed_dataset, "data/mi_dataset.csv", row.names = FALSE)
 xtable::xtable(df_na, type = "latex")
 ```
 
-
-
-
-
-
-
-
-
 <h1>Appendix of Multiple Imputation</h1>
-To test whether the previous stated argumentation is true, another MI is conducted with a larger m and more iterations.
+To test whether the previous stated argumentation is true, another MI is conducted with a larger m and more iterations. As the values speak for themselves, and the focus of the thesis is not on statistics, this is not further examined.
 
 ```{r}
 set.seed(1002)
